@@ -1,9 +1,10 @@
 // ============================================================================
 // AnimatedNumber.jsx
 // ----------------------------------------------------------------------------
-// مكوّن بسيط بيعرض رقم وبيعمله "عدّاد متحرك" من صفر (أو من آخر قيمة) لحتى
-// القيمة الجديدة، بدل ما يطلع الرقم فجأة — لمسة حيوية بسيطة بدون أي
-// مكتبة خارجية (بس requestAnimationFrame).
+// A simple component that displays a number and animates it as a counter
+// from zero (or its last value) up to the new value, instead of the number
+// just popping in suddenly — a small, lively touch with no external library
+// (just requestAnimationFrame).
 // ============================================================================
 
 import { useEffect, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ export default function AnimatedNumber({ value, decimals = 0, suffix = '' }) {
 
     function tick(now) {
       const progress = Math.min(1, (now - startTime) / DURATION_MS);
-      // easing بسيط (ease-out) عشان الحركة تبطّئ قرب النهاية، أحلى بصريًا
+      // Simple ease-out easing so the motion slows near the end — nicer visually
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = from + (to - from) * eased;
       setDisplay(current);

@@ -1,21 +1,21 @@
 // ============================================================================
 // ecoPoints.js
 // ----------------------------------------------------------------------------
-// منطق "النقاط البيئية" لكل حي:
-//   - كل بلاغ تلوث جديد بينزل نقاط الحي (عقوبة)
-//   - كل يوم ما في فيه بلاغات جديدة، نقاط الحي بترجع تزيد شوي (تعافي)
-//   النقاط محصورة دائمًا بين 0 و 100.
+// "Eco points" logic for each neighborhood:
+//   - every new pollution report drops the neighborhood's points (a penalty)
+//   - every day with no new reports, the neighborhood's points go back up a little (recovery)
+//   Points are always kept between 0 and 100.
 // ============================================================================
 
 import { supabase } from './supabaseClient.js';
 
-const PENALTY_PER_REPORT = 5; // كم نقطة تنزل مع كل بلاغ جديد
-const RECOVERY_PER_DAY = 2; // كم نقطة ترجع كل يوم بدون بلاغات جديدة
+const PENALTY_PER_REPORT = 5; // how many points drop with each new report
+const RECOVERY_PER_DAY = 2; // how many points come back each day with no new reports
 const MAX_POINTS = 100;
 const MIN_POINTS = 0;
 
 /**
- * بينزل نقاط حي معيّن بعد وصول بلاغ تلوث جديد له.
+ * Drops a given neighborhood's points after a new pollution report for it arrives.
  * @param {string} neighborhoodId
  */
 export async function applyReportPenalty(neighborhoodId) {
@@ -28,7 +28,7 @@ export async function applyReportPenalty(neighborhoodId) {
     .single();
 
   if (fetchError) {
-    console.error('❌ ما قدرنا نجيب نقاط الحي:', fetchError.message);
+    console.error("❌ Couldn't fetch the neighborhood's points:", fetchError.message);
     return;
   }
 
@@ -40,14 +40,14 @@ export async function applyReportPenalty(neighborhoodId) {
     .eq('id', neighborhoodId);
 
   if (updateError) {
-    console.error('❌ ما قدرنا نحدّث نقاط الحي:', updateError.message);
+    console.error("❌ Couldn't update the neighborhood's points:", updateError.message);
   }
 }
 
 /**
- * وظيفة دورية (بتشتغل مرة كل يوم من server.js عبر node-cron):
- * بترجع تزيد نقاط كل الأحياء اللي ما إلها بلاغات جديدة، حسب عدد
- * الأيام اللي مرّت من آخر بلاغ.
+ * A periodic job (runs once a day from server.js via node-cron): gradually
+ * increases the points of every neighborhood with no new reports, based on
+ * how many days have passed since its last report.
  */
 export async function recoverPointsForAllNeighborhoods() {
   const { data: neighborhoods, error } = await supabase
@@ -55,7 +55,7 @@ export async function recoverPointsForAllNeighborhoods() {
     .select('id, eco_points, last_report_at');
 
   if (error) {
-    console.error('❌ ما قدرنا نجيب قائمة الأحياء للتعافي:', error.message);
+    console.error("❌ Couldn't fetch the neighborhood list for recovery:", error.message);
     return;
   }
 
@@ -66,7 +66,7 @@ export async function recoverPointsForAllNeighborhoods() {
 
     const daysSinceLastReport = n.last_report_at
       ? Math.floor((now - new Date(n.last_report_at).getTime()) / (1000 * 60 * 60 * 24))
-      : 1; // إذا ما في بلاغات أبدًا، اعتبره يوم واحد فاضي
+      : 1; // if there are no reports at all, treat it as one empty day
 
     if (daysSinceLastReport < 1) continue;
 
@@ -75,5 +75,5 @@ export async function recoverPointsForAllNeighborhoods() {
     await supabase.from('neighborhoods').update({ eco_points: recovered }).eq('id', n.id);
   }
 
-  console.log(`✅ تحديث دوري لنقاط الأحياء تم الساعة ${new Date().toLocaleString()}`);
+  console.log(`✅ Periodic neighborhood points update completed at ${new Date().toLocaleString()}`);
 }

@@ -1,18 +1,19 @@
 // ============================================================================
-// App.jsx — نقطة انطلاق الواجهة الأمامية
+// App.jsx — the frontend's entry point
 // ----------------------------------------------------------------------------
-// بدل ما نستخدم مكتبة توجيه (routing) معقدة، بنستخدم "تبويبات" بسيطة
-// (state بس) للتنقل بين: الخريطة، الإبلاغ عن تلوث، ولوحة نقاط الأحياء،
-// ولوحة الإدارة (تظهر بس للأدمن).
+// Instead of using a full routing library, we use simple "tabs" (just state)
+// to navigate between: the map, reporting pollution, the neighborhood points
+// board, and the admin panel (shown only to admins).
 //
-// كمان هون بنراقب حالة "تسجيل الدخول" (session) بشكل مركزي: أول ما الصفحة
-// تفتح منجيب أي جلسة محفوظة أصلاً (لو المستخدم سجّل دخول قبل وسكّر المتصفح)،
-// وبنستمع لأي تغيير (دخول/خروج) عبر supabase.auth.onAuthStateChange.
+// We also track "login" (session) state centrally: as soon as the page
+// opens, we fetch any session already saved (if the user logged in before
+// and closed the browser), and we listen for any change (login/logout) via
+// supabase.auth.onAuthStateChange.
 //
-// وكل ما تتغيّر الجلسة، منسأل السيرفر الخلفي "هل هاد الحساب أدمن؟" —
-// السؤال هون بس عشان نعرف نظهر تبويب "الإدارة" أو لأ (تجربة استخدام
-// أحسن)؛ الحماية الحقيقية موجودة بالسيرفر الخلفي (requireAdmin middleware)
-// بغض النظر شو الواجهة عارضة.
+// Whenever the session changes, we ask the backend "is this account an
+// admin?" — this check is only so we know whether to show the "Admin" tab
+// or not (a nicer user experience); the real protection lives on the
+// backend (requireAdmin middleware) regardless of what the UI shows.
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -29,11 +30,11 @@ import { supabase } from './supabaseClient';
 import './App.css';
 
 const BASE_TABS = {
-  map: { label: '🗺️ الخريطة', component: MapView },
-  upload: { label: '📸 إبلاغ عن تلوث', component: UploadForm },
-  board: { label: '🏆 نقاط الأحياء', component: NeighborhoodBoard },
-  stats: { label: '📈 الإحصائيات', component: StatsDashboard },
-  about: { label: '📖 عن المشروع', component: AboutPage },
+  map: { label: '🗺️ Map', component: MapView },
+  upload: { label: '📸 Report Pollution', component: UploadForm },
+  board: { label: '🏆 Neighborhood Points', component: NeighborhoodBoard },
+  stats: { label: '📈 Statistics', component: StatsDashboard },
+  about: { label: '📖 About', component: AboutPage },
 };
 
 export default function App() {
@@ -42,10 +43,11 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   // ------------------------------------------------------------------
-  // دعم العمل بدون إنترنت (PWA): منراقب حالة الاتصال بالإنترنت عبر
-  // navigator.onLine + أحداث 'online'/'offline' المتصفح، عشان نعرض
-  // تنبيه واضح للمستخدم لما ينقطع النت — البيانات المعروضة وقتها بتكون
-  // آخر نسخة محفوظة محليًا (Service Worker)، مش لحظية.
+  // Offline support (PWA): we track internet connectivity via
+  // navigator.onLine + the browser's 'online'/'offline' events, so we can
+  // show a clear warning to the user when the connection drops — the data
+  // shown at that point is the last version saved locally (Service
+  // Worker), not live.
   // ------------------------------------------------------------------
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -61,12 +63,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // 1) نجيب أي جلسة محفوظة أصلاً بالمتصفح (localStorage) وقت ما الصفحة تفتح
+    // 1) Fetch any session already saved in the browser (localStorage) when the page opens
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
     });
 
-    // 2) نستمع لأي تغيير بحالة تسجيل الدخول (دخول جديد، خروج، تجديد الجلسة...)
+    // 2) Listen for any login-state change (new login, logout, session refresh...)
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
@@ -82,23 +84,24 @@ export default function App() {
     checkIsAdmin(session.access_token).then(setIsAdmin);
   }, [session]);
 
-  // تبويب "الإدارة" بيظهر بس لو المستخدم أدمن فعلًا
-  // useMemo عشان ما نصنع "object" جديد بكل مرة الكومبوننت يعيد الرسم (render)،
-  // وإلا الـ useEffect تحت رح يشتغل بلا داعي بكل مرة.
+  // The "Admin" tab only shows up if the user is actually an admin.
+  // useMemo so we don't create a new object on every render, otherwise the
+  // useEffect below would run unnecessarily every time.
   const TABS = useMemo(
     () =>
       isAdmin
         ? {
             ...BASE_TABS,
-            admin: { label: '🛡️ الإدارة', component: AdminPanel },
-            reports: { label: '📊 التقارير', component: ReportsView },
+            admin: { label: '🛡️ Admin', component: AdminPanel },
+            reports: { label: '📊 Reports', component: ReportsView },
           }
         : BASE_TABS,
     [isAdmin]
   );
 
-  // لو كنا واقفين بتبويب "الإدارة" وبعدين المستخدم سجّل خروج (أو تبيّن
-  // إنه مش أدمن)، نرجّعه تلقائيًا لتبويب الخريطة بدل ما يضل شاشة فاضية.
+  // If we were on the "Admin" tab and the user then logs out (or turns out
+  // not to be an admin), send them back automatically to the map tab
+  // instead of leaving an empty screen.
   useEffect(() => {
     if (!TABS[activeTab]) setActiveTab('map');
   }, [TABS, activeTab]);
@@ -106,9 +109,10 @@ export default function App() {
   const ActiveComponent = TABS[activeTab]?.component || MapView;
 
   // ----------------------------------------------------------------------------
-  // مؤشر متحرك (tab-indicator) تحت التبويب النشط: كل ما نبدّل تبويب، بنقيس
-  // مكان وعرض الزر النشط (getBoundingClientRect) ومنحرّك خط صغير تحته
-  // بانسيابية (transform + width بالـ CSS)، بدل ما يقفز فجأة.
+  // Animated tab indicator under the active tab: every time we switch tabs,
+  // we measure the active button's position and width (getBoundingClientRect)
+  // and smoothly move a small underline (transform + width in CSS), instead
+  // of it jumping suddenly.
   // ----------------------------------------------------------------------------
   const tabRefs = useRef({});
   const navRef = useRef(null);
@@ -126,15 +130,15 @@ export default function App() {
   }, [activeTab, TABS]);
 
   return (
-    <div className="app" dir="rtl">
+    <div className="app" dir="ltr">
       <header className="app-header no-print">
-        <h1>بصمة الحي</h1>
-        <p className="subtitle">رصد التلوث البيئي بمشاركة المجتمع — Neighborhood Footprint</p>
+        <h1>Neighborhood Footprint</h1>
+        <p className="subtitle">Community-driven environmental pollution monitoring</p>
       </header>
 
       {!isOnline && (
         <div className="offline-banner no-print">
-          📴 أنت غير متصل بالإنترنت الآن — البيانات المعروضة هلق قد تكون آخر نسخة محفوظة على جهازك. إرسال بلاغ جديد أو تسجيل الدخول بيحتاجون اتصال بالإنترنت.
+          📴 You're currently offline — the data shown may be the last version saved on your device. Submitting a new report or logging in requires an internet connection.
         </div>
       )}
 
@@ -159,10 +163,11 @@ export default function App() {
       </nav>
 
       <main className="app-main">
-        {/* منمرر session لكل التبويبات؛ التبويبات يلي ما إلها علاقة بتسجيل
-            الدخول (الخريطة، نقاط الأحياء) بترجّعا "prop" مش مستخدم، وهاد عادي.
-            key={activeTab} بيخلي React يعيد إنشاء الكومبوننت كل ما نبدّل
-            تبويب، فيتفعّل تأثير "fadeInUp" (.tab-content) من جديد كل مرة. */}
+        {/* We pass session to every tab; tabs unrelated to login (map,
+            neighborhood board) just get an unused prop, which is fine.
+            key={activeTab} makes React recreate the component every time we
+            switch tabs, re-triggering the "fadeInUp" effect (.tab-content)
+            each time. */}
         <div key={activeTab} className="tab-content">
           <ActiveComponent session={session} />
         </div>

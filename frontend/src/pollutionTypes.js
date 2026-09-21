@@ -1,38 +1,38 @@
-// ترجمة أكواد نوع التلوث (اللي بيرجعها الذكاء الاصطناعي) لنصوص عربية
-// وألوان مميزة لكل نوع، نستخدمها بالخريطة وبنتيجة رفع البلاغ. كل نوع كمان
-// إله "اقتراح" (suggestion) — نصيحة عملية قصيرة تظهر تلقائيًا مع كل بلاغ،
-// عشان البلاغ ما يضل بس رقم على الخريطة، وإنما يعطي المستخدم خطوة عملية
-// يقدر يسويها.
+// Translation of pollution type codes (returned by the AI) into English labels
+// and a distinct color for each type, used on the map and in the report result.
+// Each type also has a "suggestion" — a short practical tip shown automatically
+// with every report, so a report isn't just a dot on the map, but also gives
+// the user a concrete next step they can take.
 export const POLLUTION_TYPE_INFO = {
   garbage_burning: {
-    label: 'حرق قمامة',
+    label: 'Garbage Burning',
     color: '#7a2e2e',
-    suggestion: 'ينصح بالتواصل مع الجهة البلدية المسؤولة عن الإطفاء والبيئة، لأنه حرق النفايات قد يسبب تلوث هوائي وحرائق خطيرة.',
+    suggestion: 'Contact the local municipal fire and environment department — burning waste can cause air pollution and dangerous fires.',
   },
   air_pollution: {
-    label: 'تلوث هوائي / دخان',
+    label: 'Air Pollution / Smoke',
     color: '#6b6b6b',
-    suggestion: 'ينصح بالتواصل مع دائرة البيئة أو الجهة الصناعية المسؤولة، وتجنب التواجد بالمنطقة لفترات طويلة حتى تتحسن جودة الهواء.',
+    suggestion: 'Contact the environment department or the responsible industrial facility, and avoid spending long periods in the area until air quality improves.',
   },
   illegal_dumping: {
-    label: 'رمي نفايات عشوائي',
+    label: 'Illegal Dumping',
     color: '#8a6d3b',
-    suggestion: 'ينصح بالتواصل مع بلدية المنطقة لجدولة إزالة النفايات، وتجنب رمي نفايات إضافية بنفس المكان.',
+    suggestion: 'Contact the local municipality to schedule waste removal, and avoid dumping additional waste at the same location.',
   },
   water_pollution: {
-    label: 'تلوث مائي',
+    label: 'Water Pollution',
     color: '#2e5f7a',
-    suggestion: 'ينصح بتجنب استخدام المياه من هاد المصدر مباشرة، والتواصل مع الجهة المسؤولة عن المياه والصرف الصحي للتحقق من السبب.',
+    suggestion: 'Avoid using water from this source directly, and contact the water and sanitation authority to check the cause.',
   },
   no_pollution: {
-    label: 'لا يوجد تلوث',
+    label: 'No Pollution',
     color: '#2e7a3f',
-    suggestion: 'لا حاجة لأي إجراء — الوضع طبيعي بهاد الموقع.',
+    suggestion: 'No action needed — the situation looks normal at this location.',
   },
   unknown: {
-    label: 'غير محدد',
+    label: 'Unknown',
     color: '#999999',
-    suggestion: 'ما قدر النظام يحدد نوع التلوث بثقة كافية — يفضّل مراجعة الصورة يدويًا من فريق الإدارة.',
+    suggestion: "The system couldn't determine the pollution type with enough confidence — a manual review of the photo by the admin team is recommended.",
   },
 };
 

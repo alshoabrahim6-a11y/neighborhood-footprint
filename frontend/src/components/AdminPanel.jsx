@@ -1,13 +1,15 @@
 // ============================================================================
 // AdminPanel.jsx
 // ----------------------------------------------------------------------------
-// لوحة الإدارة: بتوري كل البلاغات (المعلّقة أولًا) وبتخلي الأدمن يوافق
-// عليها أو يرفضها. البلاغ ما بيظهر بالخريطة العامة إلا بعد الموافقة.
+// The admin panel: shows all reports (pending ones first) and lets the
+// admin approve or reject them. A report doesn't show up on the public map
+// until it's approved.
 //
-// هاد الكومبوننت ما بيتحقق هو بنفسه من صلاحية الأدمن — App.jsx هو يلي
-// بيتحقق ويقرر هل يعرض تبويب "الإدارة" أصلًا، فهون بنفترض إنه لو وصلنا
-// هون، المستخدم فعلًا أدمن (والسيرفر الخلفي بيتحقق من هاد كمان بشكل
-// منفصل ومستقل، فحتى لو حدا "خدع" الواجهة، السيرفر رح يرفضه).
+// This component doesn't check admin permission itself — App.jsx is what
+// checks and decides whether to show the "Admin" tab at all, so here we
+// assume that if we got here, the user really is an admin (and the backend
+// also checks this separately and independently, so even if someone
+// "tricks" the UI, the server will reject them).
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react';
@@ -15,9 +17,9 @@ import { fetchAdminReports, updateReportStatus } from '../api';
 import { getPollutionInfo } from '../pollutionTypes';
 
 const STATUS_LABELS = {
-  pending: { label: 'معلّق ⏳', className: 'status-pending' },
-  approved: { label: 'موافق عليه ✅', className: 'status-approved' },
-  rejected: { label: 'مرفوض ❌', className: 'status-rejected' },
+  pending: { label: 'Pending ⏳', className: 'status-pending' },
+  approved: { label: 'Approved ✅', className: 'status-approved' },
+  rejected: { label: 'Rejected ❌', className: 'status-rejected' },
 };
 
 export default function AdminPanel({ session }) {
@@ -28,8 +30,9 @@ export default function AdminPanel({ session }) {
 
   const accessToken = session?.access_token;
 
-  // useCallback عشان الدالة تنعرّف مرة وحدة (طالما accessToken ما تغيّر)،
-  // وهيك نقدر نحطها بأمان جوا [dependencies] الخاصة بـ useEffect تحت.
+  // useCallback so the function is only defined once (as long as
+  // accessToken hasn't changed), so we can safely put it in the
+  // useEffect's [dependencies] below.
   const loadReports = useCallback(async () => {
     try {
       setLoading(true);
@@ -37,7 +40,7 @@ export default function AdminPanel({ session }) {
       setReports(data);
       setError(null);
     } catch {
-      setError('ما قدرنا نجيب البلاغات. تأكد إن السيرفر الخلفي شغال.');
+      setError("Couldn't fetch the reports. Make sure the backend server is running.");
     } finally {
       setLoading(false);
     }
@@ -52,23 +55,23 @@ export default function AdminPanel({ session }) {
     try {
       setBusyId(reportId);
       await updateReportStatus(reportId, status, accessToken);
-      // بدل ما نعيد تحميل كل شي من السيرفر، منحدّث حالة البلاغ محليًا فورًا
+      // Instead of reloading everything from the server, update the report's status locally right away
       setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, status } : r)));
     } catch {
-      setError('فشلت العملية. جرب مرة ثانية.');
+      setError('The operation failed. Try again.');
     } finally {
       setBusyId(null);
     }
   }
 
   if (!accessToken) {
-    return <p className="error-text">لازم تسجّل دخول أولًا لتشوف هاي الصفحة.</p>;
+    return <p className="error-text">You need to log in first to see this page.</p>;
   }
 
   if (loading) {
     return (
       <p>
-        <span className="spinner" /> جارِ تحميل البلاغات...
+        <span className="spinner" /> Loading reports...
       </p>
     );
   }
@@ -77,9 +80,9 @@ export default function AdminPanel({ session }) {
 
   return (
     <div className="admin-page">
-      <h2>لوحة الإدارة</h2>
+      <h2>Admin Panel</h2>
       <p className="admin-summary">
-        عدد البلاغات المعلّقة يلي بحاجة مراجعة: <b>{pendingCount}</b>
+        Number of pending reports awaiting review: <b>{pendingCount}</b>
       </p>
 
       {error && <p className="error-text">{error}</p>}
@@ -88,7 +91,7 @@ export default function AdminPanel({ session }) {
         {reports.map((report, index) => {
           const info = getPollutionInfo(report.pollution_type);
           const statusInfo = STATUS_LABELS[report.status] || STATUS_LABELS.pending;
-          const confidencePct = report.ai_confidence ? `${Math.round(report.ai_confidence * 100)}%` : 'غير معروف';
+          const confidencePct = report.ai_confidence ? `${Math.round(report.ai_confidence * 100)}%` : 'unknown';
 
           return (
             <div
@@ -96,27 +99,27 @@ export default function AdminPanel({ session }) {
               className="admin-card fade-in-item"
               style={{ '--i': Math.min(index, 10) }}
             >
-              <img src={report.image_url} alt="صورة البلاغ" className="admin-card-img" />
+              <img src={report.image_url} alt="Report photo" className="admin-card-img" />
               <div className="admin-card-body">
                 <div className="admin-card-header">
                   <b style={{ color: info.color }}>{info.label}</b>
                   <span className={`status-badge ${statusInfo.className}`}>{statusInfo.label}</span>
-                  {report.is_duplicate && <span className="status-badge duplicate-badge">⚠️ بلاغ مكرر محتمل</span>}
+                  {report.is_duplicate && <span className="status-badge duplicate-badge">⚠️ Possible duplicate report</span>}
                 </div>
                 <p className="admin-card-meta">
-                  نسبة ثقة الذكاء الاصطناعي: {confidencePct}
-                  {report.neighborhoods?.name && <> · الحي: {report.neighborhoods.name}</>}
+                  AI confidence: {confidencePct}
+                  {report.neighborhoods?.name && <> · Neighborhood: {report.neighborhoods.name}</>}
                 </p>
-                {report.user_email && <p className="admin-card-meta">بلّغ بواسطة: {report.user_email}</p>}
-                {report.description && <p className="admin-card-meta">ملاحظة: {report.description}</p>}
+                {report.user_email && <p className="admin-card-meta">Reported by: {report.user_email}</p>}
+                {report.description && <p className="admin-card-meta">Note: {report.description}</p>}
                 {report.is_duplicate && (
                   <p className="duplicate-note">
-                    ⚠️ في بلاغ سابق قريب جغرافيًا ونفس النوع خلال آخر أسبوعين
+                    ⚠️ There's a previous report nearby with the same type within the last two weeks
                     {report.duplicate_report?.created_at && (
-                      <> (بتاريخ {new Date(report.duplicate_report.created_at).toLocaleDateString('ar-EG')})</>
+                      <> (dated {new Date(report.duplicate_report.created_at).toLocaleDateString('en-GB')})</>
                     )}
-                    {report.duplicate_report?.user_email && <> — بلّغ فيه: {report.duplicate_report.user_email}</>}
-                    . راجعه قبل ما توافق عليه لتتجنب ازدواجية.
+                    {report.duplicate_report?.user_email && <> — reported by: {report.duplicate_report.user_email}</>}
+                    . Review it before approving to avoid duplication.
                   </p>
                 )}
                 <p className="suggestion-text">💡 {info.suggestion}</p>
@@ -127,14 +130,14 @@ export default function AdminPanel({ session }) {
                     disabled={busyId === report.id || report.status === 'approved'}
                     onClick={() => handleDecision(report.id, 'approved')}
                   >
-                    قبول ✅
+                    Approve ✅
                   </button>
                   <button
                     className="reject-btn"
                     disabled={busyId === report.id || report.status === 'rejected'}
                     onClick={() => handleDecision(report.id, 'rejected')}
                   >
-                    رفض ❌
+                    Reject ❌
                   </button>
                 </div>
               </div>
@@ -142,7 +145,7 @@ export default function AdminPanel({ session }) {
           );
         })}
 
-        {reports.length === 0 && !error && <p>ما في ولا بلاغ لهلق.</p>}
+        {reports.length === 0 && !error && <p>No reports yet.</p>}
       </div>
     </div>
   );

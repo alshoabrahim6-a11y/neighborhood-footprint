@@ -1,31 +1,35 @@
 // ============================================================================
 // seed-demo-reports.js
 // ----------------------------------------------------------------------------
-// سكريبت لإضافة بلاغات تجريبية "كاملة البيانات" (حي محدد + نوع تلوث واضح +
-// موقع + تاريخ) مباشرة بقاعدة البيانات — مفيد قبل عرض المشروع على اللجنة
-// عشان تبويب "📈 الإحصائيات" يطلع برسوم بيانية واضحة وجميلة بدل ما يكون
-// مليان بيانات ناقصة (غير محدد) من التجربة العادية.
+// A script to add "fully-populated" demo reports (specific neighborhood +
+// clear pollution type + location + date) directly into the database — useful
+// before presenting the project to the committee so the "📈 Statistics" tab
+// shows clear, nice-looking charts instead of being full of incomplete
+// (unknown) data from normal testing.
 //
-// الاستخدام (من جوا مجلد backend):
-//   node scripts/seed-demo-reports.js "اسم الحي بالضبط" [عدد البلاغات]
+// Usage (from inside the backend folder):
+//   node scripts/seed-demo-reports.js "exact neighborhood name" [report count]
 //
-// مثال:
-//   node scripts/seed-demo-reports.js "حي النزهة" 8
+// Example:
+//   node scripts/seed-demo-reports.js "Al-Nuzha" 8
 //
-// لو ما حددت عدد، الافتراضي 8 بلاغات موزّعة على آخر 8 أسابيع (بلاغ بكل
-// أسبوع تقريبًا)، عشان الرسم الخطي بلوحة الإحصائيات يطلع بشكل تدريجي حلو
-// بدل قفزة مفاجئة بآخر أسبوع بس.
+// If you don't specify a count, the default is 8 reports spread across the
+// last 8 weeks (roughly one report per week), so the line chart on the
+// statistics dashboard shows a nice gradual progression instead of a sudden
+// jump in the last week only.
 //
-// ملاحظة مهمة: كل بلاغ منضيفه هون بنعلّمه داخليًا (بحقل ai_raw_labels، يلي
-// مش ظاهر بأي مكان بالواجهة) بعلامة { seed: true } عشان تقدر بعد العرض
-// تلاقيهم وتحذفهم بسهولة لو حبيت، بدون ما تلمس بلاغاتك الحقيقية. للحذف:
+// Important note: every report added here is internally tagged (in the
+// ai_raw_labels field, which isn't shown anywhere in the UI) with
+// { seed: true } so that after the demo you can easily find and delete them
+// without touching your real reports. To delete:
 //   node scripts/remove-demo-reports.js
 //
-// ملاحظة عن الإيميلات: كل بلاغ تجريبي هلا منربطه بـ user_email وهمي (من
-// قائمة DEMO_EMAILS تحت) — بدون user_id حقيقي (يعني مش حسابات فعلية
-// بـ Supabase Auth، بس نص عادي بعمود user_email). هاد بس عشان "لوحة
-// المتصدرين" بتبويب الإحصائيات تطلع فيها أكتر من اسم بشكل واقعي وقت
-// العرض على اللجنة، بدل ما تكون فاضية أو فيها إيميلك الشخصي بس.
+// Note about emails: every demo report is now linked to a fake user_email
+// (from the DEMO_EMAILS list below) — with no real user_id (meaning these
+// aren't actual Supabase Auth accounts, just plain text in the user_email
+// column). This is only so the "leaderboard" in the statistics tab shows
+// more than one name in a realistic way during the committee presentation,
+// instead of being empty or containing only your own personal email.
 // ============================================================================
 
 import { supabase } from '../services/supabaseClient.js';
@@ -34,18 +38,19 @@ import { applyReportPenalty } from '../services/ecoPoints.js';
 const [, , neighborhoodNameArg, countArg] = process.argv;
 
 if (!neighborhoodNameArg) {
-  console.error('❌ الاستخدام الصحيح: node scripts/seed-demo-reports.js "اسم الحي بالضبط" [عدد البلاغات]');
+  console.error('❌ Correct usage: node scripts/seed-demo-reports.js "exact neighborhood name" [report count]');
   process.exit(1);
 }
 
 const count = Number(countArg) > 0 ? Number(countArg) : 8;
 
-// نفس أنواع التلوث الموجودة بباقي المشروع (reportSummary.js / pollutionTypes.js)
-// — بدون 'no_pollution' و 'unknown' عشان الرسوم البيانية تطلع بأنواع واضحة ومفيدة
+// Same pollution types used across the rest of the project (reportSummary.js
+// / pollutionTypes.js) — without 'no_pollution' and 'unknown' so the charts
+// show clear, useful types
 const POLLUTION_TYPES = ['garbage_burning', 'air_pollution', 'illegal_dumping', 'water_pollution'];
 
-// صور جاهزة (Picsum — خدمة صور عامة مجانية) نستخدمها بس لو ما لقينا ولا
-// صورة حقيقية عندك بقاعدة البيانات نقدر نعيد استخدامها
+// Ready-made images (Picsum — a free public image service) used only if we
+// can't find any real image in your database to reuse
 const FALLBACK_IMAGES = [
   'https://picsum.photos/seed/pollution1/640/480',
   'https://picsum.photos/seed/pollution2/640/480',
@@ -53,14 +58,16 @@ const FALLBACK_IMAGES = [
   'https://picsum.photos/seed/pollution4/640/480',
 ];
 
-// موقع افتراضي احتياطي (لو ما لقينا ولا إحداثيات بقاعدة البيانات نبني عليها)
-// — عدّل هاي القيم إذا حابب تحط إحداثيات منطقتك بالضبط
+// Default fallback location (used if we can't find any coordinates in the
+// database to build on) — change these values if you'd like to set your
+// area's exact coordinates
 const DEFAULT_BASE_LAT = 3.139;
 const DEFAULT_BASE_LNG = 101.6869;
 
-// إيميلات وهمية (مش حسابات حقيقية) نوزّعها على البلاغات التجريبية، عشان
-// "لوحة المتصدرين" تطلع فيها أكتر من اسم بترتيب واقعي (أول واحد أكتر
-// بلاغات، وهيك لحد آخر واحد). عدّل الأسماء لو حابب أسماء غير هاي.
+// Fake emails (not real accounts) distributed across the demo reports, so
+// the "leaderboard" shows more than one name in a realistic ranking (the
+// first one gets the most reports, and so on down to the last one). Change
+// the names if you'd like different ones.
 const DEMO_EMAILS = [
   'sara.student@example.com',
   'omar.volunteer@example.com',
@@ -69,9 +76,10 @@ const DEMO_EMAILS = [
   'huda.green@example.com',
 ];
 
-// أوزان توزيع الإيميلات فوق (لازم يكون نفس عدد DEMO_EMAILS ومجموعها 1) —
-// أول إيميل بياخد أكبر نسبة بلاغات، وهيك بالترتيب، عشان شكل اللوحة يطلع
-// متدرّج ومنطقي متل موقف حقيقي فيه "متصدر" واضح.
+// Weights for distributing the emails above (must be the same length as
+// DEMO_EMAILS and sum to 1) — the first email gets the largest share of
+// reports, and so on in order, so the leaderboard looks graduated and
+// realistic, like a real situation with a clear "leader".
 const DEMO_EMAIL_WEIGHTS = [0.4, 0.25, 0.17, 0.11, 0.07];
 
 function pickDemoEmail() {
@@ -89,11 +97,11 @@ function jitter(value, maxOffset = 0.006) {
 }
 
 function randomConfidence() {
-  return Math.round((0.72 + Math.random() * 0.24) * 100) / 100; // بين 0.72 و 0.96
+  return Math.round((0.72 + Math.random() * 0.24) * 100) / 100; // between 0.72 and 0.96
 }
 
 async function main() {
-  // 1) نلاقي الحي بالاسم بالضبط
+  // 1) Find the neighborhood by its exact name
   const { data: neighborhood, error: nError } = await supabase
     .from('neighborhoods')
     .select('id, name')
@@ -101,22 +109,23 @@ async function main() {
     .maybeSingle();
 
   if (nError) {
-    console.error('❌ صار خطأ وقت البحث عن الحي:', nError.message);
+    console.error('❌ An error occurred while looking up the neighborhood:', nError.message);
     process.exit(1);
   }
 
   if (!neighborhood) {
     const { data: allNeighborhoods } = await supabase.from('neighborhoods').select('name');
-    console.error(`❌ ما لقيت حي بهاد الاسم بالضبط: "${neighborhoodNameArg}"`);
-    console.error('   الأحياء الموجودة عندك فعليًا:');
+    console.error(`❌ No neighborhood found with this exact name: "${neighborhoodNameArg}"`);
+    console.error('   The neighborhoods you actually have:');
     (allNeighborhoods || []).forEach((n) => console.error(`   - ${n.name}`));
     process.exit(1);
   }
 
-  console.log(`✅ لقينا الحي: ${neighborhood.name} (${neighborhood.id})`);
+  console.log(`✅ Found the neighborhood: ${neighborhood.name} (${neighborhood.id})`);
 
-  // 2) نجيب موقع (lat/lng) نبني عليه — أولوية لبلاغ حقيقي بنفس الحي،
-  // بعدها أي بلاغ بقاعدة البيانات، وإلا الموقع الافتراضي فوق
+  // 2) Get a location (lat/lng) to build on — priority to a real report in
+  // the same neighborhood, then any report in the database, otherwise the
+  // default location above
   let baseLat = DEFAULT_BASE_LAT;
   let baseLng = DEFAULT_BASE_LNG;
 
@@ -130,7 +139,7 @@ async function main() {
   if (sameNeighborhoodReport) {
     baseLat = sameNeighborhoodReport.latitude;
     baseLng = sameNeighborhoodReport.longitude;
-    console.log('📍 استخدمنا موقع بلاغ حقيقي موجود بنفس الحي كنقطة أساس.');
+    console.log('📍 Used the location of a real report in the same neighborhood as the base point.');
   } else {
     const { data: anyReport } = await supabase
       .from('reports')
@@ -141,13 +150,14 @@ async function main() {
     if (anyReport) {
       baseLat = anyReport.latitude;
       baseLng = anyReport.longitude;
-      console.log('📍 ما في بلاغات بنفس الحي، استخدمنا موقع أي بلاغ حقيقي ثاني كنقطة أساس.');
+      console.log('📍 No reports in the same neighborhood, used the location of another real report as the base point.');
     } else {
-      console.log('📍 ما في ولا بلاغ بقاعدة البيانات أصلًا، استخدمنا موقع افتراضي (عدّله بالسكريبت لو حابب).');
+      console.log('📍 There are no reports in the database at all, used a default location (edit it in the script if you like).');
     }
   }
 
-  // 3) نجيب صور حقيقية موجودة عندك بالفعل عشان نعيد استخدامها (بدل صور عامة)
+  // 3) Get real images you already have so we can reuse them (instead of
+  // generic images)
   const { data: existingImages } = await supabase
     .from('reports')
     .select('image_url')
@@ -158,18 +168,19 @@ async function main() {
     existingImages && existingImages.length > 0 ? existingImages.map((r) => r.image_url) : FALLBACK_IMAGES;
 
   if (existingImages && existingImages.length > 0) {
-    console.log(`🖼️  رح نعيد استخدام ${imagePool.length} صورة حقيقية موجودة عندك أصلًا.`);
+    console.log(`🖼️  Reusing ${imagePool.length} real image(s) you already have.`);
   } else {
-    console.log('🖼️  ما في صور حقيقية بقاعدة البيانات، رح نستخدم صور عامة (Picsum) بس للعرض.');
+    console.log('🖼️  No real images in the database, using generic (Picsum) images just for the demo.');
   }
 
-  // 4) نبني البلاغات ونوزّع تواريخها على آخر (count) أسبوع، بلاغ بكل أسبوع
-  // تقريبًا، عشان الرسم الخطي بلوحة الإحصائيات يطلع تدرّج حلو بدل قفزة
+  // 4) Build the reports and spread their dates across the last (count)
+  // weeks, roughly one report per week, so the line chart on the statistics
+  // dashboard shows a nice gradual progression instead of a jump
   const now = Date.now();
   const weekMs = 7 * 24 * 60 * 60 * 1000;
 
   const rows = Array.from({ length: count }).map((_, i) => {
-    const weeksAgo = count - 1 - i; // أقدم بلاغ أول (weeksAgo كبير)، الأحدث آخر شي
+    const weeksAgo = count - 1 - i; // oldest report first (large weeksAgo), most recent last
     const createdAt = new Date(now - weeksAgo * weekMs - Math.random() * weekMs * 0.5);
 
     return {
@@ -189,32 +200,33 @@ async function main() {
   const { data: inserted, error: insertError } = await supabase.from('reports').insert(rows).select('id');
 
   if (insertError) {
-    console.error('❌ صار خطأ وقت إضافة البلاغات التجريبية:', insertError.message);
+    console.error('❌ An error occurred while adding the demo reports:', insertError.message);
     process.exit(1);
   }
 
-  console.log(`✅ تمت إضافة ${inserted.length} بلاغ تجريبي بحي "${neighborhood.name}" بنجاح.`);
+  console.log(`✅ Successfully added ${inserted.length} demo report(s) to the "${neighborhood.name}" neighborhood.`);
 
-  // توزيع الإيميلات الوهمية اللي انحطت، عشان تعرف مسبقًا شو رح تشوف
-  // بلوحة المتصدرين قبل ما تروح تتأكد بنفسك
+  // Distribution of the fake emails that were added, so you know in advance
+  // what you'll see on the leaderboard before checking it yourself
   const emailCounts = new Map();
   for (const row of rows) {
     emailCounts.set(row.user_email, (emailCounts.get(row.user_email) || 0) + 1);
   }
-  console.log('👤 توزيع البلاغات على الإيميلات الوهمية (لوحة المتصدرين):');
+  console.log('👤 Report distribution across the fake emails (leaderboard):');
   [...emailCounts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .forEach(([email, c]) => console.log(`   - ${email}: ${c} بلاغ`));
+    .forEach(([email, c]) => console.log(`   - ${email}: ${c} report(s)`));
 
-  // 5) ننزّل نقاط الحي بنفس منطق الموافقة العادية (كل بلاغ = -5 نقاط)، عشان
-  // لوحة "نقاط الأحياء" تكون متناسقة مع البلاغات الجديدة
+  // 5) Lower the neighborhood's points using the same logic as a normal
+  // approval (each report = -5 points), so the "neighborhood points" board
+  // stays consistent with the new reports
   for (let i = 0; i < inserted.length; i++) {
     await applyReportPenalty(neighborhood.id);
   }
-  console.log(`📉 تم تحديث النقاط البيئية لحي "${neighborhood.name}" (${inserted.length} × -5 نقاط).`);
+  console.log(`📉 Updated the environmental points for "${neighborhood.name}" (${inserted.length} × -5 points).`);
 
-  console.log('\n🎉 خلص! روح لتبويب "📈 الإحصائيات" و"🏆 نقاط الأحياء" وشوف النتيجة.');
-  console.log('   لو حبيت تحذف هاي البلاغات التجريبية بعد العرض، شغّل:');
+  console.log('\n🎉 Done! Go to the "📈 Statistics" and "🏆 Neighborhood Points" tabs and check the result.');
+  console.log('   If you want to delete these demo reports after the presentation, run:');
   console.log('   node scripts/remove-demo-reports.js');
 }
 

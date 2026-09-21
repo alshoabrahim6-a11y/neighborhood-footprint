@@ -1,7 +1,7 @@
 // ============================================================================
 // routes/neighborhoods.js
 // ----------------------------------------------------------------------------
-//   GET /api/neighborhoods → قائمة الأحياء مع نقاطها البيئية (للوحة النقاط)
+//   GET /api/neighborhoods → list of neighborhoods with their eco points (for the points board)
 // ============================================================================
 
 import express from 'express';

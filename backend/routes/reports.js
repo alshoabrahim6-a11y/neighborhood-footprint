@@ -1,10 +1,10 @@
 // ============================================================================
 // routes/reports.js
 // ----------------------------------------------------------------------------
-// كل الـ endpoints (نقاط الاتصال) المتعلقة ببلاغات التلوث:
-//   POST /api/reports          → رفع بلاغ جديد (صورة + موقع)
-//   GET  /api/reports          → قائمة كل البلاغات (لعرضها كنقاط على الخريطة)
-//   GET  /api/reports/heatmap  → نفس البيانات بس بصيغة جاهزة لـ Leaflet.heat
+// All endpoints related to pollution reports:
+//   POST /api/reports          → submit a new report (photo + location)
+//   GET  /api/reports          → list of all reports (to show as points on the map)
+//   GET  /api/reports/heatmap  → the same data, formatted for Leaflet.heat
 // ============================================================================
 
 import express from 'express';
@@ -16,11 +16,12 @@ import { findDuplicateReport } from '../services/duplicateDetection.js';
 
 const router = express.Router();
 
-// multer: بيستقبل ملف الصورة المرفوع من الفورم ويحطه بالذاكرة (RAM) مؤقتًا
-// (بدل ما يخزنه على قرص السيرفر) لأننا رح نرفعه فورًا لـ Supabase Storage
+// multer: receives the uploaded image file from the form and holds it in
+// memory (RAM) temporarily (instead of storing it on the server's disk)
+// since we're about to upload it straight to Supabase Storage
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 }, // حد أقصى 8 ميجا للصورة
+  limits: { fileSize: 8 * 1024 * 1024 }, // max 8 MB per image
 });
 
 // ----------------------------------------------------------------------------
@@ -31,16 +32,18 @@ router.post('/', upload.single('image'), async (req, res) => {
     const { latitude, longitude, neighborhood_id, description } = req.body;
 
     if (!req.file) {
-      return res.status(400).json({ error: 'لازم ترفع صورة مع البلاغ (image)' });
+      return res.status(400).json({ error: 'You must upload a photo with the report (image)' });
     }
     if (!latitude || !longitude) {
-      return res.status(400).json({ error: 'لازم تبعت latitude و longitude' });
+      return res.status(400).json({ error: 'You must send latitude and longitude' });
     }
 
-    // تسجيل الدخول اختياري: لو الفرونت إند بعت هيدر "Authorization: Bearer <token>"
-    // (يعني المستخدم مسجّل دخول)، بنتحقق من التوكن مع Supabase ونجيب هويته
-    // عشان نربط البلاغ فيه. لو ما في توكن أو كان غير صالح، البلاغ بينحفظ
-    // عادي بدون ربطه بأي حساب (تسجيل الدخول مش إجباري بهاي النسخة).
+    // Logging in is optional: if the frontend sent an "Authorization:
+    // Bearer <token>" header (meaning the user is logged in), we verify
+    // the token with Supabase and get their identity so we can link the
+    // report to them. If there's no token or it's invalid, the report is
+    // saved normally without being linked to any account (login isn't
+    // required in this version).
     let userId = null;
     let userEmail = null;
     const authHeader = req.headers.authorization || '';
@@ -48,14 +51,14 @@ router.post('/', upload.single('image'), async (req, res) => {
       const token = authHeader.slice('Bearer '.length);
       const { data, error: authError } = await supabase.auth.getUser(token);
       if (authError) {
-        console.warn('⚠️ توكن تسجيل الدخول غير صالح، رح يتحفظ البلاغ بدون حساب:', authError.message);
+        console.warn('⚠️ Invalid login token, the report will be saved without an account:', authError.message);
       } else if (data?.user) {
         userId = data.user.id;
         userEmail = data.user.email;
       }
     }
 
-    // 1) رفع الصورة لـ Supabase Storage باسم فريد (تاريخ + رقم عشوائي)
+    // 1) Upload the image to Supabase Storage under a unique name (timestamp + random number)
     const fileExt = req.file.originalname.split('.').pop() || 'jpg';
     const fileName = `${Date.now()}-${Math.round(Math.random() * 1e6)}.${fileExt}`;
 
@@ -64,26 +67,27 @@ router.post('/', upload.single('image'), async (req, res) => {
       .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
 
     if (uploadError) {
-      console.error('❌ خطأ رفع الصورة:', uploadError.message);
-      return res.status(500).json({ error: 'فشل رفع الصورة لـ Storage' });
+      console.error('❌ Error uploading the image:', uploadError.message);
+      return res.status(500).json({ error: 'Failed to upload the image to Storage' });
     }
 
     const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName);
     const imageUrl = publicUrlData.publicUrl;
 
-    // 2) تصنيف الصورة بالذكاء الاصطناعي (CLIP عبر Hugging Face)
+    // 2) Classify the image with AI (CLIP via Hugging Face)
     const classification = await classifyPollutionImage(req.file.buffer);
 
-    // 2.5) كشف البلاغات المكررة: هل في بلاغ سابق قريب جغرافيًا (< 100 متر)
-    // ونفس نوع التلوث خلال آخر أسبوعين؟ ما منرفض البلاغ، بس منعلّمه عشان
-    // الأدمن يشوفه بلوحة الإدارة (راجع services/duplicateDetection.js)
+    // 2.5) Duplicate report detection: is there a previous report nearby
+    // (< 100 meters) with the same pollution type within the last two
+    // weeks? We don't reject the new report — we just flag it so the admin
+    // can see it in the admin panel (see services/duplicateDetection.js)
     const duplicateMatch = await findDuplicateReport({
       latitude: Number(latitude),
       longitude: Number(longitude),
       pollutionType: classification.pollutionType,
     });
 
-    // 3) حفظ البلاغ بقاعدة البيانات
+    // 3) Save the report to the database
     const { data: report, error: insertError } = await supabase
       .from('reports')
       .insert({
@@ -104,28 +108,29 @@ router.post('/', upload.single('image'), async (req, res) => {
       .single();
 
     if (insertError) {
-      console.error('❌ خطأ حفظ البلاغ:', insertError.message);
-      return res.status(500).json({ error: 'فشل حفظ البلاغ بقاعدة البيانات' });
+      console.error('❌ Error saving the report:', insertError.message);
+      return res.status(500).json({ error: 'Failed to save the report to the database' });
     }
 
-    // ⚠️ ملاحظة: نقاط الحي ما عادت تنزل هون فورًا. بعد ما ضفنا "لوحة
-    // الإدارة"، البلاغ بيضل بحالة "pending" (معلّق) وما بيأثر على نقاط
-    // الحي ولا بيظهر عالخريطة العامة لغاية ما أدمن يوافق عليه — حينها
-    // بس نقاط الحي بتنزل (شوف routes/admin.js).
+    // ⚠️ Note: neighborhood points no longer drop here immediately. After
+    // adding the "Admin Panel", the report stays in "pending" status and
+    // doesn't affect neighborhood points or show up on the public map until
+    // an admin approves it — only then do the neighborhood points drop
+    // (see routes/admin.js).
 
     res.status(201).json({ report, classification });
   } catch (err) {
-    console.error('❌ خطأ غير متوقع بـ POST /api/reports:', err);
-    res.status(500).json({ error: 'صار خطأ غير متوقع بالسيرفر' });
+    console.error('❌ Unexpected error in POST /api/reports:', err);
+    res.status(500).json({ error: 'An unexpected server error occurred' });
   }
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/reports  → آخر 500 بلاغ "موافق عليه" (للخريطة والقائمة العامة)
+// GET /api/reports  → the last 500 "approved" reports (for the map and public list)
 // ----------------------------------------------------------------------------
-// ⚠️ منعرض بس البلاغات يلي status = 'approved'. البلاغات الجديدة تبدأ
-// دايمًا بحالة 'pending' (معلّقة) وما بتظهر هون لغاية ما أدمن يوافق عليها
-// من لوحة الإدارة (راجع routes/admin.js).
+// ⚠️ We only show reports where status = 'approved'. New reports always
+// start out 'pending' and don't show up here until an admin approves them
+// from the admin panel (see routes/admin.js).
 router.get('/', async (req, res) => {
   const { data, error } = await supabase
     .from('reports')
@@ -141,7 +146,7 @@ router.get('/', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/reports/heatmap → [[lat, lng, intensity], ...] لـ Leaflet.heat
+// GET /api/reports/heatmap → [[lat, lng, intensity], ...] for Leaflet.heat
 // ----------------------------------------------------------------------------
 router.get('/heatmap', async (req, res) => {
   const { data, error } = await supabase
@@ -159,9 +164,10 @@ router.get('/heatmap', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/reports/stats → إحصائيات عامة (Public Dashboard) للجميع بدون
-// تسجيل دخول — إجمالي البلاغات، توزيعها حسب الحي والنوع، والاتجاه الأسبوعي
-// (راجع services/reportSummary.js → getOverallStats لتفاصيل الحساب)
+// GET /api/reports/stats → public statistics (Public Dashboard) for everyone,
+// no login required — total reports, distribution by neighborhood and type,
+// and the weekly trend (see services/reportSummary.js → getOverallStats for
+// the calculation details)
 // ----------------------------------------------------------------------------
 router.get('/stats', async (req, res) => {
   try {
@@ -173,9 +179,9 @@ router.get('/stats', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/reports/leaderboard → لوحة المتصدرين (أكتر المستخدمين نشاطًا)
-// عامة ومتاحة للجميع بدون تسجيل دخول (راجع services/reportSummary.js →
-// getLeaderboard لتفاصيل الحساب وسبب إنها آمنة نعرضها للعموم)
+// GET /api/reports/leaderboard → leaderboard (most active reporters), public
+// and available to everyone without logging in (see services/reportSummary.js
+// → getLeaderboard for the calculation details and why it's safe to show publicly)
 // ----------------------------------------------------------------------------
 router.get('/leaderboard', async (req, res) => {
   try {

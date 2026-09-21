@@ -1,14 +1,15 @@
 // ============================================================================
 // ReportsView.jsx
 // ----------------------------------------------------------------------------
-// تبويب "التقارير الدورية" (أدمن بس): بيعرض تقرير إحصائي فوري (لآخر أسبوع
-// أو شهر)، وكمان لستة "لقطات" أسبوعية بتتولّد تلقائيًا لحالها كل أحد
-// (عبر node-cron بالسيرفر الخلفي — راجع server.js). الأدمن يقدر كمان
-// يولّد لقطة فورًا يدويًا بدل ما ينتظر الموعد الأسبوعي.
+// The "Periodic Reports" tab (admin only): shows a live statistical report
+// (for the last week or month), plus a list of weekly "snapshots" generated
+// automatically every Sunday (via node-cron on the backend — see
+// server.js). The admin can also generate a snapshot immediately by hand
+// instead of waiting for the weekly schedule.
 //
-// التقرير نفسه بينطبع/يتحفظ كـ PDF باستخدام ميزة الطباعة العادية بالمتصفح
-// (window.print) — هيك ما احتجنا أي مكتبة PDF إضافية، والمتصفح بيعرض
-// العربي صح 100% (شكل الحروف واتجاه النص) بدون أي تعقيد إضافي.
+// The report itself is printed/saved as a PDF using the browser's regular
+// print feature (window.print) — this way we didn't need any extra PDF
+// library, and the browser renders text correctly with no extra complexity.
 // ============================================================================
 
 import { useEffect, useState } from 'react';
@@ -21,26 +22,26 @@ import {
 import AnimatedNumber from './AnimatedNumber';
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 // ----------------------------------------------------------------------------
-// عرض تقرير واحد (فوري أو محفوظ) — هاد الجزء بالضبط يلي بينطبع
+// Renders a single report (live or saved) — this is exactly the part that gets printed
 // ----------------------------------------------------------------------------
 function ReportContent({ report }) {
   const changeText =
     report.percentChange === null
-      ? 'لا توجد بيانات كافية للمقارنة'
+      ? 'Not enough data to compare'
       : report.percentChange >= 0
-        ? `زيادة ${report.percentChange}% عن الفترة السابقة`
-        : `انخفاض ${Math.abs(report.percentChange)}% عن الفترة السابقة`;
+        ? `${report.percentChange}% increase from the previous period`
+        : `${Math.abs(report.percentChange)}% decrease from the previous period`;
 
   return (
     <div className="printable-report">
       <div className="report-header">
-        <h2>بصمة الحي — التقرير الدوري</h2>
+        <h2>Neighborhood Footprint — Periodic Report</h2>
         <p>
-          الفترة: {formatDate(report.periodStart)} — {formatDate(report.periodEnd)}
+          Period: {formatDate(report.periodStart)} — {formatDate(report.periodEnd)}
         </p>
       </div>
 
@@ -49,28 +50,28 @@ function ReportContent({ report }) {
           <span className="report-stat-number">
             <AnimatedNumber value={report.totalReports} />
           </span>
-          <span className="report-stat-label">إجمالي البلاغات الموافق عليها</span>
+          <span className="report-stat-label">Total Approved Reports</span>
         </div>
         <div className="report-stat-box">
           <span className="report-stat-number">
             <AnimatedNumber value={report.previousTotalReports} />
           </span>
-          <span className="report-stat-label">الفترة السابقة</span>
+          <span className="report-stat-label">Previous Period</span>
         </div>
         <div className="report-stat-box">
           <span className="report-stat-number">{changeText}</span>
         </div>
       </div>
 
-      <h3>التوزيع حسب الحي</h3>
+      <h3>Distribution by Neighborhood</h3>
       {report.byNeighborhood.length === 0 ? (
-        <p>ما في بلاغات بهاي الفترة.</p>
+        <p>No reports in this period.</p>
       ) : (
         <table className="report-table">
           <thead>
             <tr>
-              <th>الحي</th>
-              <th>عدد البلاغات</th>
+              <th>Neighborhood</th>
+              <th>Report Count</th>
             </tr>
           </thead>
           <tbody>
@@ -84,15 +85,15 @@ function ReportContent({ report }) {
         </table>
       )}
 
-      <h3>التوزيع حسب نوع التلوث</h3>
+      <h3>Distribution by Pollution Type</h3>
       {report.byType.length === 0 ? (
-        <p>ما في بلاغات بهاي الفترة.</p>
+        <p>No reports in this period.</p>
       ) : (
         <table className="report-table">
           <thead>
             <tr>
-              <th>نوع التلوث</th>
-              <th>عدد البلاغات</th>
+              <th>Pollution Type</th>
+              <th>Report Count</th>
             </tr>
           </thead>
           <tbody>
@@ -107,7 +108,7 @@ function ReportContent({ report }) {
       )}
 
       <p className="report-footer">
-        تم إنشاء هاد التقرير تلقائيًا بواسطة نظام بصمة الحي بتاريخ {formatDate(new Date().toISOString())}
+        This report was generated automatically by the Neighborhood Footprint system on {formatDate(new Date().toISOString())}
       </p>
     </div>
   );
@@ -127,7 +128,7 @@ export default function ReportsView({ session }) {
     if (!accessToken) return;
     fetchSnapshots(accessToken)
       .then(setSnapshots)
-      .catch(() => setError('ما قدرنا نجيب لستة التقارير المحفوظة.'));
+      .catch(() => setError("Couldn't fetch the saved reports list."));
   }, [accessToken]);
 
   async function handleViewLive() {
@@ -137,7 +138,7 @@ export default function ReportsView({ session }) {
       const data = await fetchReportSummary(periodDays, accessToken);
       setActiveReport(data);
     } catch {
-      setError('فشل جلب التقرير. تأكد إن السيرفر الخلفي شغال.');
+      setError('Failed to fetch the report. Make sure the backend server is running.');
     } finally {
       setLoading(false);
     }
@@ -150,7 +151,7 @@ export default function ReportsView({ session }) {
       const data = await fetchSnapshotById(id, accessToken);
       setActiveReport(data);
     } catch {
-      setError('فشل جلب هاد التقرير المحفوظ.');
+      setError("Failed to fetch this saved report.");
     } finally {
       setLoading(false);
     }
@@ -165,38 +166,38 @@ export default function ReportsView({ session }) {
       const updated = await fetchSnapshots(accessToken);
       setSnapshots(updated);
     } catch {
-      setError('فشل توليد التقرير. تأكد إن السيرفر الخلفي شغال.');
+      setError('Failed to generate the report. Make sure the backend server is running.');
     } finally {
       setGenerating(false);
     }
   }
 
   if (!accessToken) {
-    return <p className="error-text">لازم تسجّل دخول أولًا لتشوف هاي الصفحة.</p>;
+    return <p className="error-text">You need to log in first to see this page.</p>;
   }
 
   return (
     <div className="reports-page">
-      <h2>التقارير الدورية</h2>
+      <h2>Periodic Reports</h2>
 
       {error && <p className="error-text">{error}</p>}
 
       <div className="reports-controls no-print">
         <div className="reports-live-controls">
           <label>
-            تقرير فوري عن:
+            Live report for:
             <select value={periodDays} onChange={(e) => setPeriodDays(Number(e.target.value))}>
-              <option value={7}>آخر 7 أيام</option>
-              <option value={30}>آخر 30 يوم</option>
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
             </select>
           </label>
           <button className="primary-btn" onClick={handleViewLive} disabled={loading}>
             {loading ? (
               <>
-                <span className="spinner" /> جاري التحميل...
+                <span className="spinner" /> Loading...
               </>
             ) : (
-              'عرض 👁️'
+              'View 👁️'
             )}
           </button>
         </div>
@@ -204,27 +205,27 @@ export default function ReportsView({ session }) {
         <button className="primary-btn" onClick={handleGenerateNow} disabled={generating}>
           {generating ? (
             <>
-              <span className="spinner" /> جاري التوليد...
+              <span className="spinner" /> Generating...
             </>
           ) : (
-            'توليد تقرير أسبوعي الآن 🔄'
+            'Generate Weekly Report Now 🔄'
           )}
         </button>
       </div>
 
       <div className="reports-snapshots-list no-print">
-        <h3>التقارير الأسبوعية المحفوظة تلقائيًا</h3>
+        <h3>Automatically Saved Weekly Reports</h3>
         {snapshots.length === 0 ? (
-          <p>ما في تقارير محفوظة لهلق — التقرير الأول رح يتولّد تلقائيًا أول أحد جاي، أو دوس "توليد تقرير أسبوعي الآن" فوق.</p>
+          <p>No saved reports yet — the first report will be generated automatically next Sunday, or click "Generate Weekly Report Now" above.</p>
         ) : (
           <ul className="snapshots-list">
             {snapshots.map((s, index) => (
               <li key={s.id} className="fade-in-item" style={{ '--i': Math.min(index, 10) }}>
                 <span>
-                  {formatDate(s.period_start)} — {formatDate(s.period_end)} ({s.total_reports} بلاغ)
+                  {formatDate(s.period_start)} — {formatDate(s.period_end)} ({s.total_reports} reports)
                 </span>
                 <button className="auth-link-btn" onClick={() => handleViewSnapshot(s.id)}>
-                  عرض 👁️
+                  View 👁️
                 </button>
               </li>
             ))}
@@ -236,7 +237,7 @@ export default function ReportsView({ session }) {
         <>
           <div className="no-print">
             <button className="primary-btn" onClick={() => window.print()}>
-              🖨️ طباعة / حفظ PDF
+              🖨️ Print / Save as PDF
             </button>
           </div>
           <ReportContent report={activeReport} />

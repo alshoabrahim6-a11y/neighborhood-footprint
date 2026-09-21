@@ -1,10 +1,11 @@
 // ============================================================================
 // MapView.jsx
 // ----------------------------------------------------------------------------
-// خريطة حرارية (heatmap) حية توضح أماكن التلوث + نقاط (markers) لكل بلاغ.
+// A live heatmap showing pollution locations + markers for each report.
 //
-// بنستخدم مكتبة Leaflet مباشرة (مش عبر react-leaflet) عشان يكون واضح خطوة
-// خطوة شو عم يصير: نعمل خريطة، نحط عليها طبقة حرارية، ونحط نقاط البلاغات.
+// We use the Leaflet library directly (not via react-leaflet) so it's clear
+// step by step what's happening: we create a map, add a heat layer to it,
+// and add report markers.
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,8 +16,8 @@ import { fetchHeatmapPoints, fetchReports } from '../api';
 import { getPollutionInfo } from '../pollutionTypes';
 import { supabase } from '../supabaseClient';
 
-// إصلاح مشكلة شائعة: أيقونة الـ marker الافتراضية بـ Leaflet ما بتظهر صح
-// مع أدوات البناء متل Vite، فبنحدد مسارات الصور يدويًا.
+// Fix a common issue: Leaflet's default marker icon doesn't show correctly
+// with build tools like Vite, so we set the image paths manually.
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -27,8 +28,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// إحداثيات افتراضية لبداية الخريطة (غيّرها لمدينتك) — هاي حاليًا تقريبًا وسط ماليزيا
-const DEFAULT_CENTER = [3.139, 101.6869]; // كوالالمبور، كمثال
+// Default coordinates for the map's starting view (change this for your city) — currently roughly central Malaysia
+const DEFAULT_CENTER = [3.139, 101.6869]; // Kuala Lumpur, as an example
 const DEFAULT_ZOOM = 12;
 
 export default function MapView() {
@@ -39,9 +40,10 @@ export default function MapView() {
   const [reportCount, setReportCount] = useState(0);
   const [liveStatus, setLiveStatus] = useState('connecting');
 
-  // كل الطبقات يلي منضيفها للخريطة (الطبقة الحرارية + نقاط البلاغات) —
-  // منتتبعها هون عشان نقدر نمسحها قبل ما نرسم الدفعة الجديدة، لما تحديث
-  // لحظي يوصل. من دون هاد، كل تحديث رح "يكوّم" نقاط فوق نقاط قديمة.
+  // All the layers we add to the map (the heat layer + report markers) — we
+  // track them here so we can clear them before drawing the new batch when
+  // a live update arrives. Without this, every update would "pile up"
+  // points on top of old ones.
   const layersRef = useRef([]);
 
   const loadData = useCallback(async (map) => {
@@ -49,29 +51,30 @@ export default function MapView() {
       setLoading(true);
       const [heatPoints, reports] = await Promise.all([fetchHeatmapPoints(), fetchReports()]);
 
-      // 🛡️ حماية من "خريطة اتشالت أثناء ما كنا منستنى رد السيرفر":
-      // هاد بيصير خصوصًا بوضع التطوير (npm run dev) لأن React (StrictMode)
-      // بيعمل "تجربة" لكل useEffect: يشغّله، يلغيه (cleanup)، ويشغّله من
-      // جديد — عشان يكشف بالضبط هيك أخطاء. إذا خلص طلب الشبكة بعد ما
-      // الخريطة القديمة انشالت (map.remove())، محاولة نستخدمها كانت
-      // بتسبب خطأ "Cannot read properties of undefined (reading
-      // 'appendChild')" لأن Leaflet ما عاد عندها "أماكن" (panes) نحط
-      // فيها الطبقات. الحل: نتأكد إن الخريطة يلي بيدنا نستخدمها لسا هي
-      // نفسها الخريطة "الحالية" (mapRef.current) قبل ما نلمسها.
+      // 🛡️ Protection against "the map was removed while we were waiting
+      // for the server's response": this happens especially in dev mode
+      // (npm run dev) because React (StrictMode) "trial-runs" every
+      // useEffect: it runs it, tears it down (cleanup), and runs it again —
+      // specifically to catch bugs like this. If the network request
+      // finishes after the old map was removed (map.remove()), trying to
+      // use it would cause a "Cannot read properties of undefined (reading
+      // 'appendChild')" error because Leaflet no longer has "panes" to add
+      // layers to. The fix: make sure the map we're about to use is still
+      // the "current" map (mapRef.current) before touching it.
       if (mapRef.current !== map) return;
 
-      // نمسح كل الطبقات يلي كانت مرسومة من قبل (لو هاد تحديث ثاني أو
-      // أكتر بسبب التحديث اللحظي)، عشان نرسم الدفعة الجديدة نظيفة
+      // Clear all previously drawn layers (if this is a second or later
+      // update due to a live update), so we draw the new batch cleanly
       layersRef.current.forEach((layer) => map.removeLayer(layer));
       layersRef.current = [];
 
-      // 1) الطبقة الحرارية
+      // 1) The heat layer
       if (heatPoints.length > 0) {
         const heatLayer = L.heatLayer(heatPoints, { radius: 30, blur: 20, maxZoom: 17 }).addTo(map);
         layersRef.current.push(heatLayer);
       }
 
-      // 2) نقطة (marker) لكل بلاغ مع معلومات بالنافذة المنبثقة (popup)
+      // 2) A marker for every report with info in a popup
       reports.forEach((report) => {
         const info = getPollutionInfo(report.pollution_type);
         const marker = L.circleMarker([report.latitude, report.longitude], {
@@ -84,16 +87,16 @@ export default function MapView() {
 
         const confidencePct = report.ai_confidence
           ? `${Math.round(report.ai_confidence * 100)}%`
-          : 'غير معروف';
+          : 'unknown';
 
         marker.bindPopup(`
-          <div style="text-align:right; font-family: sans-serif; min-width:180px">
+          <div style="text-align:left; font-family: sans-serif; min-width:180px">
             <img src="${report.image_url}" style="width:100%; border-radius:6px; margin-bottom:6px" />
             <b>${info.label}</b><br/>
-            نسبة ثقة الذكاء الاصطناعي: ${confidencePct}<br/>
-            ${report.neighborhoods?.name ? `الحي: ${report.neighborhoods.name}<br/>` : ''}
-            ${report.user_email ? `بلّغ بواسطة: ${report.user_email}<br/>` : ''}
-            ${report.description ? `ملاحظة: ${report.description}<br/>` : ''}
+            AI confidence: ${confidencePct}<br/>
+            ${report.neighborhoods?.name ? `Neighborhood: ${report.neighborhoods.name}<br/>` : ''}
+            ${report.user_email ? `Reported by: ${report.user_email}<br/>` : ''}
+            ${report.description ? `Note: ${report.description}<br/>` : ''}
             <span style="color:#1f5c3a">💡 ${info.suggestion}</span>
           </div>
         `);
@@ -103,14 +106,14 @@ export default function MapView() {
       setError(null);
     } catch (err) {
       console.error(err);
-      setError('ما قدرنا نجيب بيانات الخريطة. تأكد إن السيرفر الخلفي شغال.');
+      setError("Couldn't fetch map data. Make sure the backend server is running.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // نعمل الخريطة مرة وحدة بس (لما الكومبوننت يظهر أول مرة)
+    // Create the map only once (when the component first appears)
     if (mapRef.current) return;
 
     const map = L.map(mapContainerRef.current).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -124,19 +127,22 @@ export default function MapView() {
     loadData(map);
 
     // ------------------------------------------------------------------
-    // تحديث لحظي (Realtime): منشترك بقناة Supabase Realtime عشان نعرف
-    // أول ما يصير أي تغيير بجدول reports (بلاغ جديد، موافقة، رفض...)
-    // بدون ما المستخدم يحتاج يعمل Refresh يدويًا للصفحة. أول ما توصل أي
-    // إشعار، منعيد تحميل بيانات الخريطة (loadData) من جديد.
+    // Realtime updates: we subscribe to a Supabase Realtime channel so we
+    // know as soon as any change happens in the reports table (a new
+    // report, an approval, a rejection...) without the user needing to
+    // manually refresh the page. As soon as any notification arrives, we
+    // reload the map data (loadData) again.
     //
-    // ⚠️ لازم يكون جدول reports مفعّل فيه "Realtime" من إعدادات Supabase
-    // (راجع database/migrations/003_enable_realtime.sql)، وإلا ما رح
-    // توصلنا أي إشعارات (الخريطة بتضل شغالة عادي بس بدون تحديث لحظي).
+    // ⚠️ The reports table must have "Realtime" enabled in the Supabase
+    // settings (see database/migrations/003_enable_realtime.sql), otherwise
+    // no notifications will reach us (the map will still work fine, just
+    // without live updates).
     let refreshTimeout = null;
     const scheduleRefresh = () => {
-      // "تهدئة" بسيطة (debounce): لو وصلت كذا إشعار قريبين من بعض (مثلاً
-      // بلاغ جديد ثم موافقة عليه بعد ثانية)، منسوي طلب تحديث واحد بس
-      // بدل ما نضرب السيرفر بطلب لكل إشعار
+      // A simple debounce: if several notifications arrive close together
+      // (e.g. a new report followed by its approval a second later), we
+      // do just one refresh request instead of hitting the server for
+      // every notification
       if (refreshTimeout) clearTimeout(refreshTimeout);
       refreshTimeout = setTimeout(() => {
         if (mapRef.current === map) loadData(map);
@@ -150,7 +156,7 @@ export default function MapView() {
         setLiveStatus(status === 'SUBSCRIBED' ? 'live' : status === 'CLOSED' ? 'idle' : 'error');
       });
 
-    // تنظيف الخريطة والاشتراك لما الكومبوننت يختفي (تجنب تسريب الذاكرة)
+    // Clean up the map and subscription when the component unmounts (avoid memory leaks)
     return () => {
       if (refreshTimeout) clearTimeout(refreshTimeout);
       supabase.removeChannel(channel);
@@ -162,10 +168,10 @@ export default function MapView() {
   return (
     <div className="map-page">
       <div className="map-header">
-        <h2>خريطة التلوث الحرارية</h2>
+        <h2>Pollution Heatmap</h2>
         <div className="map-header-badges">
-          {liveStatus === 'live' && <span className="live-badge">🟢 تحديث لحظي مفعّل</span>}
-          {!loading && !error && <span className="badge">{reportCount} بلاغ مسجّل</span>}
+          {liveStatus === 'live' && <span className="live-badge">🟢 Live updates enabled</span>}
+          {!loading && !error && <span className="badge">{reportCount} reports recorded</span>}
         </div>
       </div>
       {error && <p className="error-text">{error}</p>}

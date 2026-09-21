@@ -1,8 +1,9 @@
 // ============================================================================
 // NeighborhoodBoard.jsx
 // ----------------------------------------------------------------------------
-// لوحة تعرض كل حي مع "نقاطه البيئية" (eco points) — من 0 (وضع سيء) لـ 100
-// (نظيف). النقاط بتنزل مع كل بلاغ تلوث وبترجع تزيد تدريجيًا بدون بلاغات.
+// A board showing each neighborhood with its "eco points" — from 0 (bad
+// condition) to 100 (clean). Points drop with each pollution report and
+// gradually recover over time without new reports.
 // ============================================================================
 
 import { useEffect, useState } from 'react';
@@ -10,9 +11,9 @@ import { fetchNeighborhoods } from '../api';
 import AnimatedNumber from './AnimatedNumber';
 
 function pointsColor(points) {
-  if (points >= 70) return '#2e7a3f'; // أخضر
-  if (points >= 40) return '#c98a1b'; // برتقالي
-  return '#a12e2e'; // أحمر
+  if (points >= 70) return '#2e7a3f'; // green
+  if (points >= 40) return '#c98a1b'; // orange
+  return '#a12e2e'; // red
 }
 
 export default function NeighborhoodBoard() {
@@ -22,12 +23,12 @@ export default function NeighborhoodBoard() {
   useEffect(() => {
     fetchNeighborhoods()
       .then(setNeighborhoods)
-      .catch(() => setError('ما قدرنا نجيب بيانات الأحياء. تأكد إن السيرفر شغال.'));
+      .catch(() => setError("Couldn't fetch neighborhood data. Make sure the server is running."));
   }, []);
 
   return (
     <div className="board-page">
-      <h2>لوحة النقاط البيئية للأحياء</h2>
+      <h2>Neighborhood Eco Points Board</h2>
       {error && <p className="error-text">{error}</p>}
       <div className="neighborhood-list">
         {neighborhoods.map((n, index) => (

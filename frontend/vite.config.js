@@ -7,30 +7,33 @@ export default defineConfig({
   plugins: [
     react(),
     // ------------------------------------------------------------------
-    // دعم PWA (تطبيق ويب تقدمي) — يخلي الموقع:
-    //   1) قابل للتثبيت (Add to Home Screen) على الموبايل والكمبيوتر
-    //   2) شغال جزئيًا بدون إنترنت: الواجهة نفسها (HTML/CSS/JS) بتنحفظ
-    //      محليًا (Service Worker)، وآخر بيانات معروضة (خريطة، إحصائيات،
-    //      قائمة أحياء...) بتنحفظ كمان عشان تطلع حتى لو النت مقطوع —
-    //      طبعًا إرسال بلاغ جديد أو تسجيل الدخول بيضلوا محتاجين إنترنت
-    //      فعلي، هاد بس لتصفح البيانات يلي أصلًا انحفظت قبل الانقطاع.
+    // PWA support (Progressive Web App) — makes the site:
+    //   1) Installable (Add to Home Screen) on mobile and desktop
+    //   2) Partially usable offline: the UI itself (HTML/CSS/JS) is cached
+    //      locally (Service Worker), and the last data shown (map,
+    //      statistics, neighborhood list...) is also cached so it still
+    //      shows up even if the connection drops — of course, submitting a
+    //      new report or logging in still needs an actual internet
+    //      connection; this is just for browsing data that was already
+    //      saved before the disconnect.
     // ------------------------------------------------------------------
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
-      // بنفعّل الـ Service Worker حتى بوضع التطوير (npm run dev)، مش بس
-      // بالنسخة النهائية (npm run build) — عشان تقدر تجرب ميزة العمل بدون
-      // إنترنت مباشرة وأنت شغّال بالتطوير، بدون ما تحتاج تعمل build يدوي
+      // We enable the Service Worker even in dev mode (npm run dev), not
+      // just in the final build (npm run build) — so you can try the
+      // offline feature directly while developing, without needing to run
+      // a manual build
       devOptions: {
         enabled: true,
         type: 'module',
       },
       manifest: {
-        name: 'بصمة الحي — Neighborhood Footprint',
-        short_name: 'بصمة الحي',
-        description: 'رصد التلوث البيئي بمشاركة المجتمع — تطبيق مشروع تخرج',
-        lang: 'ar',
-        dir: 'rtl',
+        name: 'Neighborhood Footprint',
+        short_name: 'Neighborhood Footprint',
+        description: 'Community-driven environmental pollution monitoring — a graduation project app',
+        lang: 'en',
+        dir: 'ltr',
         theme_color: '#1f5c3a',
         background_color: '#f4f7f5',
         display: 'standalone',
@@ -42,11 +45,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // نحفظ (precache) كل ملفات الواجهة الأساسية تلقائيًا وقت البناء
+        // Precache all core UI files automatically at build time
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
         runtimeCaching: [
-          // 1) بلاطات خريطة OpenStreetMap — نحفظها عشان أجزاء الخريطة يلي
-          // المستخدم تصفحها قبل تضل تظهر حتى بدون إنترنت
+          // 1) OpenStreetMap map tiles — cached so the parts of the map the
+          // user has already browsed still show up even without internet
           {
             urlPattern: /^https:\/\/[abc]\.tile\.openstreetmap\.org\/.*/i,
             handler: 'CacheFirst',
@@ -56,7 +59,7 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // 2) صور بلاغات التلوث المرفوعة على Supabase Storage
+          // 2) Pollution report images uploaded to Supabase Storage
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
             handler: 'CacheFirst',
@@ -66,9 +69,10 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // 3) بيانات السيرفر الخلفي (خريطة، إحصائيات، أحياء...) — بنجرب
-          // الشبكة أولًا دايمًا (عشان البيانات تكون حديثة)، ولو ما في
-          // إنترنت منستخدم آخر نسخة محفوظة بدل ما تطلع صفحة فاضية
+          // 3) Backend data (map, statistics, neighborhoods...) — we always
+          // try the network first (so the data stays fresh), and if there's
+          // no internet we use the last saved version instead of showing a
+          // blank page
           {
             urlPattern: ({ url, request }) =>
               request.method === 'GET' && /\/api\/(reports|neighborhoods)/.test(url.pathname),

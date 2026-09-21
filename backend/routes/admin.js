@@ -1,16 +1,17 @@
 // ============================================================================
 // routes/admin.js
 // ----------------------------------------------------------------------------
-// كل الـ endpoints الخاصة بلوحة الإدارة (Admin Panel). كلها محمية بـ
-// requireAdmin: أي طلب مش من حساب أدمن بينرفض تلقائيًا قبل ما يوصل هون.
+// All the endpoints for the Admin Panel. All protected by requireAdmin: any
+// request not from an admin account is automatically rejected before it
+// reaches here.
 //
-//   GET   /api/admin/check                    → للتأكد (من الفرونت إند) إن المستخدم أدمن
-//   GET   /api/admin/reports                  → كل البلاغات (معلّقة أولًا) لمراجعتها
-//   PATCH /api/admin/reports/:id/status       → قبول أو رفض بلاغ معيّن
-//   GET   /api/admin/reports/summary          → ملخص إحصائي فوري لفترة معيّنة (تقرير حي)
-//   GET   /api/admin/reports/snapshots        → لستة التقارير الأسبوعية المحفوظة تلقائيًا
-//   GET   /api/admin/reports/snapshots/:id    → تفاصيل تقرير أسبوعي محفوظ معيّن
-//   POST  /api/admin/reports/snapshots/generate → توليد تقرير أسبوعي فورًا يدويًا (بدل انتظار الموعد)
+//   GET   /api/admin/check                    → lets the frontend confirm the user is an admin
+//   GET   /api/admin/reports                  → all reports (pending first) for review
+//   PATCH /api/admin/reports/:id/status       → approve or reject a given report
+//   GET   /api/admin/reports/summary          → live statistical summary for a given period (a quick report)
+//   GET   /api/admin/reports/snapshots        → list of automatically saved weekly reports
+//   GET   /api/admin/reports/snapshots/:id    → details of a specific saved weekly report
+//   POST  /api/admin/reports/snapshots/generate → generate a weekly report immediately, by hand (instead of waiting for the schedule)
 // ============================================================================
 
 import express from 'express';
@@ -21,7 +22,7 @@ import { getPeriodSummary, saveWeeklySnapshot } from '../services/reportSummary.
 
 const router = express.Router();
 
-// كل الـ endpoints تحت هون بتمر أول شي على requireAdmin
+// All endpoints below first pass through requireAdmin
 router.use(requireAdmin);
 
 router.get('/check', (req, res) => {
@@ -29,7 +30,7 @@ router.get('/check', (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/admin/reports → كل البلاغات، البلاغات "المعلّقة" (pending) أولًا
+// GET /api/admin/reports → all reports, with "pending" ones first
 // ----------------------------------------------------------------------------
 router.get('/reports', async (req, res) => {
   const { data, error } = await supabase
@@ -42,9 +43,10 @@ router.get('/reports', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
-  // نرتب بحيث "pending" تطلع فوق (أهم شي يراجعه الأدمن)، وباقي البلاغات
-  // تحتها بترتيبها الأصلي (الأحدث أولًا). Array.prototype.sort مستقر
-  // (stable) بجافاسكريبت الحديث، فترتيب "الأحدث أولًا" جوا كل مجموعة بيضل.
+  // Sort so "pending" reports show up on top (the most important thing for
+  // the admin to review), with the rest below in their original order
+  // (newest first). Array.prototype.sort is stable in modern JavaScript, so
+  // the "newest first" order within each group is preserved.
   const sorted = [...data].sort((a, b) => {
     if (a.status === b.status) return 0;
     if (a.status === 'pending') return -1;
@@ -63,7 +65,7 @@ router.patch('/reports/:id/status', async (req, res) => {
   const { status } = req.body;
 
   if (!['approved', 'rejected', 'pending'].includes(status)) {
-    return res.status(400).json({ error: 'قيمة status لازم تكون approved أو rejected أو pending' });
+    return res.status(400).json({ error: 'status must be approved, rejected, or pending' });
   }
 
   const { data: existing, error: fetchError } = await supabase
@@ -73,17 +75,18 @@ router.patch('/reports/:id/status', async (req, res) => {
     .single();
 
   if (fetchError || !existing) {
-    return res.status(404).json({ error: 'البلاغ غير موجود' });
+    return res.status(404).json({ error: 'Report not found' });
   }
 
   const { error: updateError } = await supabase.from('reports').update({ status }).eq('id', id);
 
   if (updateError) {
-    return res.status(500).json({ error: 'فشل تحديث حالة البلاغ' });
+    return res.status(500).json({ error: 'Failed to update the report status' });
   }
 
-  // نقاط الحي بتنزل بس أول مرة ينوافق فيها على البلاغ (تجنّب تكرار
-  // العقوبة لو الأدمن ضغط "قبول" أكتر من مرة بالغلط)
+  // Neighborhood points only drop the first time a report gets approved
+  // (avoids applying the penalty twice if the admin accidentally clicks
+  // "Approve" more than once)
   if (status === 'approved' && existing.status !== 'approved' && existing.neighborhood_id) {
     await applyReportPenalty(existing.neighborhood_id);
   }
@@ -92,8 +95,8 @@ router.patch('/reports/:id/status', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/admin/reports/summary?days=7 → ملخص إحصائي فوري لآخر N يوم
-// (مش محفوظ — بيتحسب لحظيًا كل ما الأدمن يفتح الصفحة أو يغيّر الفترة)
+// GET /api/admin/reports/summary?days=7 → a live statistical summary for the last N days
+// (not saved — computed live every time the admin opens the page or changes the period)
 // ----------------------------------------------------------------------------
 router.get('/reports/summary', async (req, res) => {
   const days = Number(req.query.days) || 7;
@@ -107,8 +110,8 @@ router.get('/reports/summary', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/admin/reports/snapshots → لستة التقارير الأسبوعية المحفوظة
-// (يلي بتتولّد تلقائيًا كل أسبوع عبر node-cron — راجع server.js)
+// GET /api/admin/reports/snapshots → list of saved weekly reports
+// (generated automatically every week via node-cron — see server.js)
 // ----------------------------------------------------------------------------
 router.get('/reports/snapshots', async (req, res) => {
   const { data, error } = await supabase
@@ -125,7 +128,7 @@ router.get('/reports/snapshots', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// GET /api/admin/reports/snapshots/:id → تفاصيل تقرير أسبوعي محفوظ معيّن
+// GET /api/admin/reports/snapshots/:id → details of a specific saved weekly report
 // ----------------------------------------------------------------------------
 router.get('/reports/snapshots/:id', async (req, res) => {
   const { data, error } = await supabase
@@ -135,16 +138,17 @@ router.get('/reports/snapshots/:id', async (req, res) => {
     .single();
 
   if (error || !data) {
-    return res.status(404).json({ error: 'التقرير غير موجود' });
+    return res.status(404).json({ error: 'Report not found' });
   }
 
   res.json(data.summary);
 });
 
 // ----------------------------------------------------------------------------
-// POST /api/admin/reports/snapshots/generate → توليد وحفظ تقرير أسبوعي فورًا
-// (نفس الوظيفة التلقائية بالضبط، بس الأدمن بيشغّلها يدويًا لما يحب،
-// بدون ما ينتظر الموعد الأسبوعي — مفيد للتجربة والعرض)
+// POST /api/admin/reports/snapshots/generate → generate and save a weekly report immediately
+// (exactly the same as the automatic job, but the admin triggers it by hand
+// whenever they like, without waiting for the weekly schedule — useful for
+// testing and demos)
 // ----------------------------------------------------------------------------
 router.post('/reports/snapshots/generate', async (req, res) => {
   try {

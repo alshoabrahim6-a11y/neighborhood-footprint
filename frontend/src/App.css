@@ -1,11 +1,11 @@
 /* ============================================================================
-   بصمة الحي — نظام التصميم النهائي
+   Neighborhood Footprint — final design system
    ----------------------------------------------------------------------------
-   لوحة ألوان: أخضر (بيئة/طبيعة) + ذهبي (لمسة تميّز واحترافية)، كل الألوان
-   معرّفة كمتغيرات CSS بأعلى الملف (:root) عشان تكون منظّمة ومتناسقة بكل
-   مكان بالتطبيق. كمان أضفنا حركات (animations) بسيطة وواضحة: دخول تدريجي
-   للبطاقات، عدّاد أرقام متحرك، مؤشر متحرك تحت التبويب النشط، وتأثيرات
-   hover على الأزرار.
+   Color palette: green (environment/nature) + gold (a distinctive, professional touch), all colors
+   defined as CSS variables at the top of the file (:root) to stay organized and consistent
+   throughout the app. We also added simple, clear animations: cards fading in gradually,
+   an animated number counter, an animated indicator under the active tab, and hover
+   effects on buttons.
    ============================================================================ */
 
 :root {
@@ -48,7 +48,7 @@ body {
   color: var(--color-text);
 }
 
-/* ---------- حركات عامة (keyframes) ---------- */
+/* ---------- General animations (keyframes) ---------- */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -134,7 +134,7 @@ body {
   opacity: 0.92;
 }
 
-/* ---------- تنبيه انقطاع الإنترنت (PWA) ---------- */
+/* ---------- Offline banner (PWA) ---------- */
 .offline-banner {
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
@@ -145,7 +145,7 @@ body {
   font-weight: 600;
 }
 
-/* ---------- Auth (تسجيل الدخول) ---------- */
+/* ---------- Auth (login) ---------- */
 .auth-bar {
   display: flex;
   align-items: center;
@@ -229,7 +229,7 @@ body {
   color: var(--color-text-muted);
 }
 
-/* ---------- Tabs + مؤشر متحرك ---------- */
+/* ---------- Tabs + animated indicator ---------- */
 .tabs {
   display: flex;
   background: white;
@@ -283,7 +283,7 @@ body {
   animation: fadeInUp 0.35s ease both;
 }
 
-/* ---------- عناصر عامة: بطاقات متدرجة الظهور، سبينر ---------- */
+/* ---------- General elements: fade-in cards, spinner ---------- */
 .fade-in-item {
   opacity: 0;
   animation: fadeInUp 0.45s ease forwards;
@@ -474,7 +474,7 @@ body {
   font-size: 0.9rem;
 }
 
-/* ---------- اقتراح الحل التلقائي ---------- */
+/* ---------- Automatic suggestion ---------- */
 .suggestion-text {
   margin: 8px 0 0;
   padding: 8px 12px;
@@ -486,7 +486,7 @@ body {
   line-height: 1.6;
 }
 
-/* ---------- Admin panel (لوحة الإدارة) ---------- */
+/* ---------- Admin panel ---------- */
 .admin-summary {
   margin-top: 0;
   color: var(--color-text-muted);
@@ -626,7 +626,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ---------- Reports (التقارير الدورية) ---------- */
+/* ---------- Reports (periodic reports) ---------- */
 .reports-page h2 {
   margin-top: 0;
 }
@@ -762,7 +762,7 @@ body {
 .report-table td {
   border: 1px solid var(--color-border);
   padding: 8px 10px;
-  text-align: right;
+  text-align: left;
   font-size: 0.9rem;
 }
 
@@ -777,8 +777,8 @@ body {
   text-align: center;
 }
 
-/* عند الطباعة (أو حفظ PDF عبر طباعة المتصفح): نخفي كل شي إلا التقرير نفسه،
-   وننزع أي ظل/حركة عشان الملف المطبوع يطلع نظيف */
+/* When printing (or saving as PDF via the browser's print feature): hide everything except
+   the report itself, and remove any shadow/animation so the printed file looks clean */
 @media print {
   .no-print {
     display: none !important;
@@ -847,7 +847,7 @@ body {
   font-weight: 600;
 }
 
-/* ---------- About (عن المشروع) ---------- */
+/* ---------- About ---------- */
 .about-hero {
   background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-accent-light) 100%);
   border: 1px solid var(--color-border);
@@ -913,7 +913,7 @@ body {
   line-height: 1.7;
 }
 
-/* ---------- Stats dashboard (لوحة الإحصائيات) ---------- */
+/* ---------- Stats dashboard ---------- */
 .stats-page h2 {
   margin-top: 0;
 }
@@ -950,7 +950,7 @@ body {
   }
 }
 
-/* ---------- لوحة المتصدرين (Leaderboard) ---------- */
+/* ---------- Leaderboard ---------- */
 .leaderboard-hint {
   margin: 0 0 12px;
   color: var(--color-text-muted, #666);

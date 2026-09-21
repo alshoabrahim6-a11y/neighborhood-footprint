@@ -1,9 +1,9 @@
 // ============================================================================
-// server.js — نقطة انطلاق السيرفر
+// server.js — the server's entry point
 // ----------------------------------------------------------------------------
-// هاد الملف بيسوي: يجهز express، يفعّل CORS (عشان الواجهة الأمامية تقدر
-// تناديه من بورت مختلف)، يربط الـ routes، وبيشغّل وظيفة تعافي النقاط
-// اليومية بشكل تلقائي طول ما السيرفر شغال.
+// This file: sets up express, enables CORS (so the frontend can call it from
+// a different port), wires up the routes, and runs the daily points-recovery
+// job automatically for as long as the server is running.
 // ============================================================================
 
 import express from 'express';
@@ -22,34 +22,35 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors()); // يسمح للفرونت إند (مثلا localhost:5173) يتواصل مع هاد السيرفر
+app.use(cors()); // lets the frontend (e.g. localhost:5173) talk to this server
 app.use(express.json());
 
-// فحص سريع: افتح http://localhost:4000/ بالمتصفح للتأكد إن السيرفر شغال
+// Quick check: open http://localhost:4000/ in a browser to confirm the server is running
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', project: 'بصمة الحي - Neighborhood Footprint API' });
+  res.json({ status: 'ok', project: 'Neighborhood Footprint API' });
 });
 
 app.use('/api/reports', reportsRouter);
 app.use('/api/neighborhoods', neighborhoodsRouter);
 app.use('/api/admin', adminRouter);
 
-// جدولة يومية: كل يوم الساعة 3 فجرًا (بتوقيت السيرفر) نشغّل تعافي النقاط
+// Daily schedule: every day at 3 AM (server time) we run the points recovery job
 // (node-cron format: minute hour day month weekday)
 cron.schedule('0 3 * * *', () => {
-  console.log('⏰ بدء وظيفة تعافي نقاط الأحياء اليومية...');
+  console.log('⏰ Starting the daily neighborhood points recovery job...');
   recoverPointsForAllNeighborhoods();
 });
 
-// جدولة أسبوعية: كل يوم أحد الساعة 6 صباحًا (بتوقيت السيرفر) نولّد ونحفظ
-// "التقرير الدوري" التلقائي (راجع services/reportSummary.js). لازم السيرفر
-// يكون شغال وقتها عشان الوظيفة تشتغل — الأدمن كمان يقدر يولّد تقرير فوري
-// يدويًا من لوحة الإدارة بدون ما ينتظر هاد الموعد.
+// Weekly schedule: every Sunday at 6 AM (server time) we generate and save
+// the automatic "periodic report" (see services/reportSummary.js). The
+// server needs to be running at that time for the job to run — the admin
+// can also generate a report on demand manually from the admin panel
+// without waiting for this schedule.
 cron.schedule('0 6 * * 0', () => {
-  console.log('⏰ بدء وظيفة التقرير الأسبوعي التلقائي...');
-  saveWeeklySnapshot().catch((err) => console.error('❌ فشل التقرير الأسبوعي التلقائي:', err.message));
+  console.log('⏰ Starting the automatic weekly report job...');
+  saveWeeklySnapshot().catch((err) => console.error('❌ Automatic weekly report failed:', err.message));
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 السيرفر شغال على http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });

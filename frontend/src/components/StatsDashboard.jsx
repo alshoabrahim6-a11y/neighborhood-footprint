@@ -1,14 +1,15 @@
 // ============================================================================
 // StatsDashboard.jsx
 // ----------------------------------------------------------------------------
-// تبويب "الإحصائيات" — متاح للجميع بدون تسجيل دخول، وبيعرض 3 رسوم بيانية
-// (Chart.js عبر react-chartjs-2) مبنية على إجمالي البلاغات الموافق عليها:
-//   1) رسم أعمدة  → عدد البلاغات حسب الحي
-//   2) رسم دائري  → توزيع البلاغات حسب نوع التلوث
-//   3) رسم خطي    → عدد البلاغات بكل أسبوع من آخر 8 أسابيع (الاتجاه العام)
+// The "Statistics" tab — available to everyone without logging in, showing
+// 3 charts (Chart.js via react-chartjs-2) built from the total approved
+// reports:
+//   1) Bar chart   → number of reports by neighborhood
+//   2) Pie chart   → distribution of reports by pollution type
+//   3) Line chart  → number of reports per week for the last 8 weeks (overall trend)
 //
-// البيانات كلها "مجمّعة" (aggregated) وما فيها ولا معلومة شخصية — نفس مستوى
-// الخصوصية يلي الخريطة الحرارية العامة أصلاً بتعرضه.
+// All the data is "aggregated" and contains no personal information — the
+// same privacy level as the public heatmap already shows.
 // ============================================================================
 
 import { useEffect, useState } from 'react';
@@ -28,7 +29,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { fetchLeaderboard, fetchPublicStats } from '../api';
 import AnimatedNumber from './AnimatedNumber';
 
-// رموز الميداليات لأول 3 مراكز بلوحة المتصدرين
+// Medal icons for the top 3 spots on the leaderboard
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 ChartJS.register(
@@ -43,14 +44,14 @@ ChartJS.register(
   Legend
 );
 
-// نفس لوحة الألوان الأساسية للتطبيق (أخضر + ذهبي) بالإضافة لألوان مساعدة
-// لباقي شرائح الرسم الدائري لما يكون في أكتر من نوعين-ثلاثة تلوث
+// The app's core color palette (green + gold) plus a few helper colors for
+// the rest of the pie chart's slices when there are more than two or three pollution types
 const CHART_COLORS = ['#1f5c3a', '#c99a2e', '#4a90a4', '#a12e2e', '#7a5c99', '#5c6b62'];
 
 const FONT_FAMILY = "'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif";
 
 function formatWeekLabel(iso) {
-  return new Date(iso).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 export default function StatsDashboard() {
@@ -62,13 +63,13 @@ export default function StatsDashboard() {
   useEffect(() => {
     fetchPublicStats()
       .then(setStats)
-      .catch(() => setError('ما قدرنا نجيب الإحصائيات. تأكد إن السيرفر الخلفي شغال.'));
+      .catch(() => setError("Couldn't fetch the statistics. Make sure the backend server is running."));
   }, []);
 
   useEffect(() => {
     fetchLeaderboard(10)
       .then(setLeaderboard)
-      .catch(() => setLeaderboardError('ما قدرنا نجيب لوحة المتصدرين.'));
+      .catch(() => setLeaderboardError("Couldn't fetch the leaderboard."));
   }, []);
 
   if (error) {
@@ -78,7 +79,7 @@ export default function StatsDashboard() {
   if (!stats) {
     return (
       <p>
-        <span className="spinner" /> جارِ تحميل الإحصائيات...
+        <span className="spinner" /> Loading statistics...
       </p>
     );
   }
@@ -90,7 +91,7 @@ export default function StatsDashboard() {
     labels: stats.byNeighborhood.map((n) => n.name),
     datasets: [
       {
-        label: 'عدد البلاغات',
+        label: 'Number of Reports',
         data: stats.byNeighborhood.map((n) => n.count),
         backgroundColor: '#1f5c3a',
         borderRadius: 6,
@@ -115,7 +116,7 @@ export default function StatsDashboard() {
     labels: stats.weeklyTrend.map((w) => formatWeekLabel(w.weekStart)),
     datasets: [
       {
-        label: 'بلاغات الأسبوع',
+        label: 'Reports per Week',
         data: stats.weeklyTrend.map((w) => w.count),
         borderColor: '#c99a2e',
         backgroundColor: 'rgba(201, 154, 46, 0.15)',
@@ -131,33 +132,33 @@ export default function StatsDashboard() {
 
   return (
     <div className="stats-page">
-      <h2>لوحة الإحصائيات</h2>
+      <h2>Statistics Dashboard</h2>
 
       <div className="report-stats-row fade-in-item">
         <div className="report-stat-box">
           <span className="report-stat-number">
             <AnimatedNumber value={stats.totalReports} />
           </span>
-          <span className="report-stat-label">إجمالي البلاغات الموافق عليها</span>
+          <span className="report-stat-label">Total Approved Reports</span>
         </div>
         <div className="report-stat-box">
           <span className="report-stat-number" style={{ fontSize: '1.1rem' }}>
             {topNeighborhood}
           </span>
-          <span className="report-stat-label">الحي الأكثر بلاغات</span>
+          <span className="report-stat-label">Most Reported Neighborhood</span>
         </div>
         <div className="report-stat-box">
           <span className="report-stat-number" style={{ fontSize: '1.1rem' }}>
             {topType}
           </span>
-          <span className="report-stat-label">نوع التلوث الأكثر انتشارًا</span>
+          <span className="report-stat-label">Most Common Pollution Type</span>
         </div>
       </div>
 
       <div className="stats-chart-card fade-in-item" style={{ '--i': 1 }}>
-        <h3>عدد البلاغات حسب الحي</h3>
+        <h3>Number of Reports by Neighborhood</h3>
         {stats.byNeighborhood.length === 0 ? (
-          <p>ما في بيانات كافية لعرض هاد الرسم لسا.</p>
+          <p>Not enough data to show this chart yet.</p>
         ) : (
           <div className="stats-chart-box">
             <Bar
@@ -178,9 +179,9 @@ export default function StatsDashboard() {
 
       <div className="stats-charts-grid">
         <div className="stats-chart-card fade-in-item" style={{ '--i': 2 }}>
-          <h3>التوزيع حسب نوع التلوث</h3>
+          <h3>Distribution by Pollution Type</h3>
           {stats.byType.length === 0 ? (
-            <p>ما في بيانات كافية لعرض هاد الرسم لسا.</p>
+            <p>Not enough data to show this chart yet.</p>
           ) : (
             <div className="stats-chart-box">
               <Doughnut
@@ -196,7 +197,7 @@ export default function StatsDashboard() {
         </div>
 
         <div className="stats-chart-card fade-in-item" style={{ '--i': 3 }}>
-          <h3>الاتجاه الأسبوعي (آخر 8 أسابيع)</h3>
+          <h3>Weekly Trend (Last 8 Weeks)</h3>
           <div className="stats-chart-box">
             <Line
               data={lineData}
@@ -215,22 +216,22 @@ export default function StatsDashboard() {
       </div>
 
       <div className="stats-chart-card fade-in-item leaderboard-card" style={{ '--i': 4 }}>
-        <h3>لوحة المتصدرين 🏆</h3>
-        <p className="leaderboard-hint">أكتر المستخدمين نشاطًا بالإبلاغ (حسب عدد البلاغات الموافق عليها)</p>
+        <h3>Leaderboard 🏆</h3>
+        <p className="leaderboard-hint">Most active reporters (by number of approved reports)</p>
         {leaderboardError && <p className="error-text">{leaderboardError}</p>}
         {!leaderboardError && !leaderboard && (
           <p>
-            <span className="spinner" /> جارِ تحميل لوحة المتصدرين...
+            <span className="spinner" /> Loading leaderboard...
           </p>
         )}
-        {leaderboard && leaderboard.length === 0 && <p>ما في بيانات كافية لعرض لوحة المتصدرين لسا.</p>}
+        {leaderboard && leaderboard.length === 0 && <p>Not enough data to show the leaderboard yet.</p>}
         {leaderboard && leaderboard.length > 0 && (
           <ol className="leaderboard-list">
             {leaderboard.map((entry, index) => (
               <li key={entry.email} className="leaderboard-row fade-in-item" style={{ '--i': index }}>
                 <span className="leaderboard-rank">{MEDALS[index] || `#${index + 1}`}</span>
                 <span className="leaderboard-email">{entry.email}</span>
-                <span className="leaderboard-count">{entry.count} بلاغ</span>
+                <span className="leaderboard-count">{entry.count} reports</span>
               </li>
             ))}
           </ol>

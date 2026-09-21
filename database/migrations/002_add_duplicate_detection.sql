@@ -1,17 +1,21 @@
 -- ============================================================================
 -- 002_add_duplicate_detection.sql
 -- ----------------------------------------------------------------------------
--- ميزة "كشف البلاغات المكررة": بنضيف عمودين لجدول reports:
---   is_duplicate  → هل النظام حس إنه هاد البلاغ مشابه/مكرر لبلاغ سابق قريب
---   duplicate_of  → id البلاغ الأصلي يلي شابهه (لو في تكرار)
+-- "Duplicate report detection" feature: we add two columns to the reports
+-- table:
+--   is_duplicate  → whether the system detected that this report is
+--                   similar/duplicate to a nearby previous report
+--   duplicate_of  → the id of the original report it resembles (if it's a
+--                   duplicate)
 --
--- ⚠️ هاد بس تعديل على "شكل" الجدول (schema) — ما بيمسح ولا يغيّر أي بلاغ
--- موجود عندك حاليًا. كل البلاغات القديمة رح تنحط تلقائيًا is_duplicate = false.
+-- ⚠️ This is only a change to the table's "shape" (schema) — it does not
+-- delete or change any report you currently have. All old reports will
+-- automatically get is_duplicate = false.
 --
--- طريقة التشغيل (مرة وحدة بس)، بالضبط متل schema.sql:
---   1) افتح مشروعك على supabase.com
---   2) من القائمة الجانبية: SQL Editor
---   3) اعمل New query، الصق كل محتوى هاد الملف، واضغط Run
+-- How to run it (only once), exactly like schema.sql:
+--   1) Open your project on supabase.com
+--   2) From the side menu: SQL Editor
+--   3) Click New query, paste this entire file's content, and click Run
 -- ============================================================================
 
 alter table reports
@@ -20,9 +24,9 @@ alter table reports
 
 create index if not exists idx_reports_duplicate_of on reports(duplicate_of);
 
-comment on column reports.is_duplicate is 'هل النظام كشف إنه هاد البلاغ مشابه جغرافيًا/بالنوع لبلاغ سابق قريب';
-comment on column reports.duplicate_of is 'id البلاغ الأصلي يلي هاد البلاغ يشبهه (لو في تكرار محتمل)';
+comment on column reports.is_duplicate is 'Whether the system detected that this report is geographically/type-similar to a nearby previous report';
+comment on column reports.duplicate_of is 'The id of the original report this one resembles (if there is a potential duplicate)';
 
 -- ============================================================================
--- خلص! رجع عالتطبيق — ما في داعي تعمل أي إعادة تشغيل لقاعدة البيانات
+-- Done! Go back to the app — no need to restart the database
 -- ============================================================================

@@ -1,7 +1,7 @@
 {
   "name": "neighborhood-footprint-backend",
   "version": "1.0.0",
-  "description": "السيرفر الخلفي لمشروع بصمة الحي (Neighborhood Footprint)",
+  "description": "Backend server for the Neighborhood Footprint project",
   "type": "module",
   "main": "server.js",
   "scripts": {

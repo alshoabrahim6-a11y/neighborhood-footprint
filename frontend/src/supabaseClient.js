@@ -1,11 +1,13 @@
 // ============================================================================
 // supabaseClient.js (frontend)
 // ----------------------------------------------------------------------------
-// اتصال بـ Supabase من المتصفح، بس عشان "تسجيل الدخول" (Auth) — مش لقراءة
-// أو كتابة بيانات التلوث مباشرة (هاي بتضل تمر عبر السيرفر الخلفي دايمًا،
-// متل ما هو موضح بملف README تحت "أشياء مهمة تعرفها").
+// Connection to Supabase from the browser, just for "login" (Auth) — not for
+// reading or writing pollution data directly (that always goes through the
+// backend server, as explained in the README under "Important things to
+// know").
 //
-// بنستخدم هون مفتاح "anon" (العام) فقط — آمن تمامًا يظهر بكود المتصفح.
+// We only use the "anon" (public) key here — completely safe to expose in
+// browser code.
 // ============================================================================
 
 import { createClient } from '@supabase/supabase-js';
@@ -15,7 +17,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    '⚠️ ناقص VITE_SUPABASE_URL أو VITE_SUPABASE_ANON_KEY بملف frontend/.env — تسجيل الدخول ما رح يشتغل. راجع README.md.'
+    '⚠️ Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in frontend/.env — login will not work. See README.md.'
   );
 }
 

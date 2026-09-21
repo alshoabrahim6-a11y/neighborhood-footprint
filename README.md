@@ -1,253 +1,273 @@
-# بصمة الحي (Neighborhood Footprint)
+# Neighborhood Footprint
 
-نظام ويب لرصد التلوث البيئي بمشاركة المجتمع (Citizen Science): المستخدمين
-يرفعوا صور لمصادر تلوث بحيّهم، الذكاء الاصطناعي يصنّف نوع التلوث تلقائيًا،
-والنظام يعرض خريطة حرارية حية + نقاط بيئية لكل حي.
+A community-driven (Citizen Science) environmental pollution monitoring web
+system: users upload photos of pollution sources in their neighborhood, AI
+automatically classifies the type of pollution, and the system displays a
+live heatmap + eco points for each neighborhood.
 
-هاد أول نسخة (MVP) — هيكل المشروع الأساسي شغّال فعليًا: ارفع صورة، شوفها
-عالخريطة، وشوف نقاط حيك تتغيّر. باقي الميزات (تقارير دورية، حسابات
-مستخدمين، لوحة إدارة) رح نضيفها خطوة خطوة بعدين — شوف قسم "الخطوات الجاية"
-بالأسفل.
+This is the first version (MVP) — the core project structure is actually
+working: upload a photo, see it on the map, and watch your neighborhood's
+points change. The remaining features (periodic reports, user accounts,
+admin panel) will be added step by step later — see the "Next Steps"
+section below.
 
 ---
 
-## 1) شو المشروع مبني عليه (Tech Stack) وليش
+## 1) What the project is built on (Tech Stack) and why
 
-| الجزء | التقنية | ليش اخترناها |
+| Part | Technology | Why we chose it |
 |---|---|---|
-| الواجهة الأمامية | React + Vite | تقدر تبني واجهة تفاعلية بمكونات (components) صغيرة وواضحة |
-| الخريطة | Leaflet + OpenStreetMap | مجانية 100%، بدون API key، فيها إضافة heatmap جاهزة |
-| السيرفر الخلفي | Node.js + Express | نفس اللي تدربت عليه بـ PERN، بسيط وواسع الانتشار |
-| قاعدة البيانات + تخزين الصور | Supabase (PostgreSQL) | نفس اللي استخدمته بمشروع BIT4273، ما بتحتاج تنصّب سيرفر قاعدة بيانات بجهازك |
-| الذكاء الاصطناعي | موديل ResNet-50 عبر Hugging Face + خريطة كلمات مفتاحية | موديل تصنيف صور جاهز ومتوفر مجانًا بشكل دائم، مع طبقة كود بسيطة تربط تصنيفاته بأنواع التلوث عندنا |
+| Frontend | React + Vite | Lets you build an interactive UI with small, clear components |
+| Map | Leaflet + OpenStreetMap | 100% free, no API key, has a ready-made heatmap plugin |
+| Backend | Node.js + Express | Same as what was learned with PERN, simple and widely used |
+| Database + image storage | Supabase (PostgreSQL) | Same as used in the BIT4273 project, no need to install a database server on your machine |
+| AI | ResNet-50 model via Hugging Face + a keyword map | A ready-made, permanently free image classification model, with a simple code layer connecting its classifications to our pollution types |
 
-### كيف بيشتغل تصنيف الذكاء الاصطناعي بالضبط؟
+### How exactly does the AI classification work?
 
-**⚠️ تحديث:** أول نسخة كانت مبنية على موديل CLIP بطريقة "Zero-Shot
-Classification" (مقارنة الصورة بأوصاف نصية حرة زي "دخان أسود من حرق
-قمامة"). لما جربنا المشروع فعليًا، اكتشفنا إن Hugging Face وقفوا استضافة
-هاد النوع من الموديلات مجانًا (لا CLIP ولا أي موديل zero-shot-image
-تاني متوفر حاليًا مجانًا على منصتهم). فرجعنا لطريقة أبسط وأثبت إنها شغالة:
+**⚠️ Update:** the first version was built on the CLIP model using "Zero-Shot
+Classification" (comparing the image against free-text descriptions like
+"black smoke from burning garbage"). When we actually tried the project, we
+discovered that Hugging Face stopped hosting this type of model for free
+(neither CLIP nor any other zero-shot-image model is currently available for
+free on their platform). So we went back to a simpler, proven-to-work
+approach:
 
-نستخدم موديل **microsoft/resnet-50** — موديل تصنيف صور مشهور ومتوفر مجانًا
-بشكل دائم، بس هو مدرب على تصنيف عام لـ 1000 نوع غرض/مشهد (قطط، سيارات،
-أدوات...) اسمها **ImageNet** — مش مدرب خصيصًا على "تلوث". عشان نربط
-تصنيفاته العامة بأنواع التلوث عندنا، بنعمل "خريطة كلمات مفتاحية" بالكود:
-إذا الموديل رجع تصنيف فيه كلمة زي `ashcan` (سلة قمامة) أو `volcano`
-(بركان/دخان)، منربطه بنوع التلوث المناسب. الكود والخريطة كاملة موجودين
-بـ `backend/services/aiClassifier.js` مع شرح كل خطوة.
+We use the **microsoft/resnet-50** model — a well-known, permanently free
+image classification model, but it's trained on a general classification of
+1000 object/scene types (cats, cars, tools...) called **ImageNet** — not
+trained specifically on "pollution". To connect its general classifications
+to our pollution types, we build a "keyword map" in the code: if the model
+returns a classification containing a word like `ashcan` (trash can) or
+`volcano` (volcano/smoke), we map it to the matching pollution type. The
+full code and map are in `backend/services/aiClassifier.js` with an
+explanation of every step.
 
-**صراحة لتقرير مشروعك:** هاي طريقة تقريبية (approximation) لأنها موديل
-عام مش مدرب خصيصًا على صور تلوث، فدقتها محدودة ومتوقع تشوف تصنيفات غلط
-أو "غير محدد" أحيانًا. هاد نقطة تحسين مستقبلية موثّقة بقسم "الخطوات
-الجاية" (تدريب موديل مخصص لاحقًا بصور حقيقية من المستخدمين).
+**Being honest for your project report:** this is an approximation, since
+it's a general model not trained specifically on pollution images, so its
+accuracy is limited and you should expect to see wrong classifications or
+"unknown" sometimes. This is a documented future improvement point in the
+"Next Steps" section (training a custom model later with real images from
+users).
 
 ---
 
-## 2) هيكل المشروع
+## 2) Project structure
 
 ```
 neighborhood-footprint/
-├── backend/                 السيرفر الخلفي (Express API)
-│   ├── server.js            نقطة انطلاق السيرفر
-│   ├── routes/               مسارات الـ API (reports, neighborhoods, admin)
-│   ├── middleware/            requireAdmin.js — حماية مسارات لوحة الإدارة
-│   ├── scripts/                make-admin.js — لتعيين حساب كأدمن من الـ Terminal
-│   ├── services/              منطق الاتصال بـ Supabase + الذكاء الاصطناعي + النقاط
-│   └── .env.example           نموذج ملف الإعدادات السرية
-├── frontend/                 الواجهة الأمامية (React)
+├── backend/                 Backend (Express API)
+│   ├── server.js            Server entry point
+│   ├── routes/               API routes (reports, neighborhoods, admin)
+│   ├── middleware/            requireAdmin.js — protects admin panel routes
+│   ├── scripts/                make-admin.js — sets an account as admin from the Terminal
+│   ├── services/              Logic for connecting to Supabase + AI + points
+│   └── .env.example           Template for the secret settings file
+├── frontend/                 Frontend (React)
 │   └── src/
 │       ├── components/        MapView, UploadForm, NeighborhoodBoard, AuthPanel, AdminPanel, ReportsView
-│       ├── api.js             كل الاتصالات مع السيرفر الخلفي
-│       └── pollutionTypes.js  ترجمة أنواع التلوث للعربي + ألوان
+│       ├── api.js             All communication with the backend
+│       └── pollutionTypes.js  Pollution type labels + colors
 ├── database/
-│   └── schema.sql             أوامر SQL لإنشاء الجداول على Supabase
-└── README.md                  هاد الملف
+│   └── schema.sql             SQL commands to create the tables on Supabase
+└── README.md                  This file
 ```
 
 ---
 
-## 3) خطوات التشغيل — اتبعها بالترتيب بالضبط
+## 3) Setup steps — follow them in exact order
 
-### الخطوة 1: تجهيز الأدوات
+### Step 1: Prepare the tools
 
-- ثبّت [Node.js](https://nodejs.org) (النسخة LTS) إذا ما كان مثبت عندك.
-- تأكد إنه اشتغل: افتح Command Prompt أو PowerShell واكتب:
+- Install [Node.js](https://nodejs.org) (the LTS version) if you don't have it.
+- Make sure it's working: open Command Prompt or PowerShell and type:
   ```
   node --version
   npm --version
   ```
 
-### الخطوة 2: إنشاء مشروع Supabase (قاعدة البيانات + تخزين الصور)
+### Step 2: Create a Supabase project (database + image storage)
 
-1. روح لـ [supabase.com](https://supabase.com) وسجّل حساب مجاني (فيه خطة Free كافية للمشروع).
-2. اعمل **New Project**. اختار اسم وباسوورد لقاعدة البيانات (احفظه بمكان آمن).
-3. لما المشروع يخلص يتجهز (بياخد دقيقة أو دقيقتين)، روح لـ **SQL Editor** من القائمة الجانبية.
-4. افتح ملف `database/schema.sql` من هاد المشروع، انسخ كل محتواه، الصقه بالـ SQL Editor، واضغط **Run**.
-   - هاد بينشئلك جدولين: `neighborhoods` (الأحياء ونقاطها) و `reports` (البلاغات).
-5. روح لـ **Storage** من القائمة الجانبية، اعمل **New bucket**، سمّيه بالضبط: `pollution-photos`، وفعّل خيار **Public bucket** (عشان روابط الصور تشتغل بالمتصفح مباشرة).
-6. روح لـ **Project Settings > API**. رح تحتاج قيمتين بالخطوة الجاية:
+1. Go to [supabase.com](https://supabase.com) and sign up for a free account (the Free plan is enough for the project).
+2. Create a **New Project**. Choose a name and a database password (save it somewhere safe).
+3. Once the project finishes setting up (takes a minute or two), go to **SQL Editor** from the side menu.
+4. Open the `database/schema.sql` file from this project, copy all its content, paste it into the SQL Editor, and click **Run**.
+   - This creates two tables for you: `neighborhoods` (neighborhoods and their points) and `reports` (the reports).
+5. Go to **Storage** from the side menu, create a **New bucket**, name it exactly: `pollution-photos`, and enable the **Public bucket** option (so image links work directly in the browser).
+6. Go to **Project Settings > API**. You'll need two values for the next step:
    - **Project URL**
-   - **service_role key** (تحت API keys — **احذر ما تشاركه مع حدا ولا ترفعه ع GitHub**)
+   - **service_role key** (under API keys — **be careful not to share it with anyone or upload it to GitHub**)
 
-### الخطوة 3: إنشاء حساب Hugging Face (للذكاء الاصطناعي)
+### Step 3: Create a Hugging Face account (for the AI)
 
-1. روح لـ [huggingface.co](https://huggingface.co/join) وسجّل حساب مجاني.
-2. روح لـ [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
-3. اعمل **New token**، وبالمهم هون:
-   - اختار نوع **Fine-grained** (مش Read العادي)
-   - من قائمة الصلاحيات، فعّل **"Make calls to Inference Providers"**
-   - ⚠️ هاي الصلاحية بالذات ضرورية — بدونها رح ياخدلك السيرفر خطأ 401/403 وقت التصنيف، حتى لو التوكن صحيح
-4. انسخ التوكن (بيبدأ بـ `hf_`)
+1. Go to [huggingface.co](https://huggingface.co/join) and sign up for a free account.
+2. Go to [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+3. Create a **New token**, and the important part here:
+   - Choose the **Fine-grained** type (not the regular Read type)
+   - From the permissions list, enable **"Make calls to Inference Providers"**
+   - ⚠️ This specific permission is required — without it the server will give you a 401/403 error at classification time, even if the token is otherwise correct
+4. Copy the token (it starts with `hf_`)
 
-> إذا كنت عملت توكن من نوع Read قبل هيك ومش شغال، ارجع وأنشئ وحدة جديدة Fine-grained بالصلاحية المذكورة فوق، واستبدل القيمة القديمة بملف `.env`.
+> If you previously created a Read-type token and it's not working, go back and create a new Fine-grained one with the permission mentioned above, and replace the old value in the `.env` file.
 
-### الخطوة 4: تشغيل السيرفر الخلفي (backend)
+### Step 4: Run the backend
 
-1. افتح Command Prompt/Terminal جوا مجلد `backend`.
-2. انسخ ملف `.env.example` وسمّي النسخة `.env`.
-3. افتح `.env` وعبّي القيم:
-   - `SUPABASE_URL` و `SUPABASE_SERVICE_ROLE_KEY` (من الخطوة 2)
-   - `HUGGINGFACE_API_KEY` (من الخطوة 3)
-4. ثبّت المكتبات:
+1. Open a Command Prompt/Terminal inside the `backend` folder.
+2. Copy the `.env.example` file and name the copy `.env`.
+3. Open `.env` and fill in the values:
+   - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (from Step 2)
+   - `HUGGINGFACE_API_KEY` (from Step 3)
+4. Install the packages:
    ```
    npm install
    ```
-5. شغّل السيرفر:
+5. Start the server:
    ```
    npm run dev
    ```
-6. لازم تشوف رسالة: `🚀 السيرفر شغال على http://localhost:4000`
-   - جرب تفتح الرابط بالمتصفح، المفروض تشوف رسالة JSON بسيطة تأكد إن السيرفر شغال.
+6. You should see the message: `🚀 Server running at http://localhost:4000`
+   - Try opening the link in your browser, you should see a simple JSON message confirming the server is running.
 
-### الخطوة 5: تشغيل الواجهة الأمامية (frontend)
+### Step 5: Run the frontend
 
-1. افتح Command Prompt/Terminal **جديد** (خلّي السيرفر الخلفي شغال بالنافذة القديمة) جوا مجلد `frontend`.
-2. انسخ ملف `.env.example` وسمّي النسخة `.env` (القيمة الافتراضية `http://localhost:4000` تمام إذا ما غيّرت رقم البورت).
-3. ثبّت المكتبات:
+1. Open a **new** Command Prompt/Terminal (leave the backend server running in the old window) inside the `frontend` folder.
+2. Copy the `.env.example` file and name the copy `.env` (the default value `http://localhost:4000` is fine if you didn't change the port number).
+3. Install the packages:
    ```
    npm install
    ```
-4. شغّل الواجهة:
+4. Start the frontend:
    ```
    npm run dev
    ```
-5. افتح الرابط اللي بيطلعلك بالـ Terminal (عادة `http://localhost:5173`).
+5. Open the link shown in the Terminal (usually `http://localhost:5173`).
 
-### الخطوة 6: جرّب النظام
+### Step 6: Try out the system
 
-1. من تبويب **📸 إبلاغ عن تلوث**: اختر صورة (أي صورة تجريبية فيها دخان أو قمامة)، اضغط "استخدم موقعي الحالي" أو دخّل إحداثيات يدويًا، اختر حي، واضغط إرسال.
-2. انتظر شوي (الذكاء الاصطناعي بياخد بضع ثواني، خصوصًا أول مرة).
-3. روح لتبويب **🗺️ الخريطة** — لازم تشوف نقطة جديدة مكان الصورة.
-4. روح لتبويب **🏆 نقاط الأحياء** — لازم تشوف نقاط الحي اللي اخترته نزلت شوي.
+1. From the **📸 Report Pollution** tab: choose a photo (any test photo with smoke or garbage in it), click "Use my current location" or enter coordinates manually, choose a neighborhood, and click submit.
+2. Wait a bit (the AI takes a few seconds, especially the first time).
+3. Go to the **🗺️ Map** tab — you should see a new point where the photo was.
+4. Go to the **🏆 Neighborhood Points** tab — you should see the points for the neighborhood you chose go down slightly.
 
-**ملاحظة عن دقة التصنيف:** بما إن الموديل عام (مش مدرب خصيصًا على تلوث)،
-طلوع "غير محدد" أحيانًا أو تصنيف مش دقيق 100% أمر متوقع ومش عطل بالضرورة.
-اللي لازم يقلقك هو لو طلعت **رسالة خطأ حمراء** بنافذة الـ backend وقت
-الإرسال (مثلاً `401`، `403`، أو `network_error`) — هاد فعلاً عطل، وعادة
-سببه التوكن (راجع الخطوة 3) أو قيمة غلط بملف `.env`.
+**Note about classification accuracy:** since the model is general-purpose
+(not trained specifically on pollution), getting "unknown" sometimes or a
+classification that isn't 100% accurate is expected and not necessarily a
+malfunction. What you should worry about is if you see a **red error
+message** in the backend window at submission time (e.g. `401`, `403`, or
+`network_error`) — that's a real problem, usually caused by the token
+(check Step 3) or a wrong value in the `.env` file.
 
 ---
 
-### الخطوة 7: تفعيل تسجيل الدخول (Authentication)
+### Step 7: Enable login (Authentication)
 
-هاي ميزة إضافية (اختيارية بالنسبة للمستخدم النهائي — الموقع بيضل يشتغل
-بدون تسجيل دخول)، بس تفعيلها من طرفك (المطوّر) يحتاج 3 خطوات بسيطة:
+This is an extra feature (optional for the end user — the site keeps
+working without logging in), but enabling it on your side (the developer)
+takes 3 simple steps:
 
-1. **تحديث قاعدة البيانات:** روح لمشروعك على supabase.com → **SQL Editor**،
-   والصق هاد الكود واضغط **Run** (بيضيف عمودين جداد لجدول البلاغات: مين
-   بعتها ومن أي إيميل):
+1. **Update the database:** go to your project on supabase.com → **SQL Editor**,
+   paste this code and click **Run** (it adds two new columns to the
+   reports table: who sent it and from which email):
    ```sql
    alter table reports add column if not exists user_id uuid references auth.users(id) on delete set null;
    alter table reports add column if not exists user_email text;
    ```
 
-2. **(اختياري بس موصى فيه أثناء التطوير) تعطيل تأكيد الإيميل:** روح لـ
-   **Authentication → Providers → Email**، وأطفي خيار
-   **"Confirm email"**. هيك أي حساب جديد تسويه بينفعك تسجّل دخول فيه فورًا
-   بدون ما تحتاج تفتح إيميلك وتضغط رابط تأكيد — أسهل بكتير وقت التجربة.
-   (تقدر ترجّعها تشتغل لاحقًا لو حبيت أمان أكتر بمرحلة النشر النهائية).
+2. **(Optional but recommended during development) Disable email
+   confirmation:** go to **Authentication → Providers → Email**, and turn
+   off the **"Confirm email"** option. This way any new account you create
+   lets you log in immediately without needing to open your email and click
+   a confirmation link — much easier while testing.
+   (You can turn it back on later if you want more security for the final
+   deployment stage.)
 
-3. **جيب مفتاح "anon" وحطه بملف `.env` تبع الـ frontend:**
-   - روح لـ **Project Settings → API**.
-   - انسخ قيمة **"anon public"** (مش service_role — هاد المفتاح آمن يظهر بالمتصفح).
-   - افتح `frontend/.env` (أو انسخه من `.env.example` لو ما عملتها قبل)، وعبّي:
+3. **Get the "anon" key and put it in the frontend's `.env` file:**
+   - Go to **Project Settings → API**.
+   - Copy the **"anon public"** value (not service_role — this key is safe to expose in the browser).
+   - Open `frontend/.env` (or copy it from `.env.example` if you haven't already), and fill in:
      ```
-     VITE_SUPABASE_URL=https://xxxxx.supabase.co   (نفس URL يلي بملف backend/.env)
-     VITE_SUPABASE_ANON_KEY=eyJ...                  (مفتاح anon الجديد)
+     VITE_SUPABASE_URL=https://xxxxx.supabase.co   (same URL as in backend/.env)
+     VITE_SUPABASE_ANON_KEY=eyJ...                  (the new anon key)
      ```
-   - بما إنه تحديث بملف `.env`، لازم توقف السيرفر الأمامي (`Ctrl+C`) وتشغّله
-     من جديد (`npm install` مرة وحدة أول — عشان مكتبة Supabase الجديدة
-     الجدة بالفرونت إند — وبعدها `npm run dev`) عشان يقرأ القيم الجديدة.
+   - Since this is a `.env` update, you need to stop the frontend server
+     (`Ctrl+C`) and start it again (`npm install` once first — for the new
+     Supabase library in the frontend — then `npm run dev`) so it picks up
+     the new values.
 
-بعد هيك رح تشوف شريط صغير فوق الموقع فيه "تسجيل دخول / حساب جديد". أي
-مستخدم يسجّل دخول ويرفع بلاغ، بينحفظ إيميله مع البلاغ (وبيظهر بنافذة
-البلاغ على الخريطة). المستخدم يلي ما بده يسجّل دخول، البلاغ إله بيضل
-يشتغل عادي بس بدون ربطه بحساب.
+After this you'll see a small bar at the top of the site with "Log in / New
+account". Any user who logs in and submits a report will have their email
+saved with the report (and it will show up in the report's popup on the
+map). A user who doesn't want to log in can still submit reports normally,
+just without linking them to an account.
 
 ---
 
-### الخطوة 8: تفعيل لوحة الإدارة (Admin Panel)
+### Step 8: Enable the Admin Panel
 
-هاي الميزة بتضيف "مراجعة" على البلاغات: أي بلاغ جديد بيصير حالته
-`معلّق (pending)` وما بيظهر عالخريطة العامة ولا بلوحة نقاط الأحياء إلا
-بعد ما حساب أدمن يوافق عليه من لوحة إدارة خاصة. هيك منقدر نمنع بلاغات
-مزعجة أو غلط من الظهور مباشرة للكل.
+This feature adds a "review" step to reports: any new report starts with
+status `pending` and doesn't appear on the public map or the neighborhood
+points board until an admin account approves it from a dedicated admin
+panel. This lets us prevent annoying or incorrect reports from showing up
+to everyone right away.
 
-1. **تحديث قاعدة البيانات:** روح لمشروعك على supabase.com → **SQL Editor**،
-   اعمل **New query**، افتح ملف `database/schema.sql` من هاد المشروع من
-   جديد، انسخ **كل محتواه** (الملف كامل تحدّث وفيه إضافات جديدة بالآخر)،
-   الصقه، واضغط **Run**.
-   - هاد بيضيف جدول جديد اسمه `admins` (لائحة الحسابات المسموح إلها تدخل
-     على لوحة الإدارة)، وبيوافق تلقائيًا على أي بلاغات كانت موجودة قبل
-     هلق (عشان ما تختفي فجأة من الخريطة).
+1. **Update the database:** go to your project on supabase.com → **SQL Editor**,
+   create a **New query**, open the `database/schema.sql` file from this
+   project again, copy **all of its content** (the entire file has been
+   updated with new additions at the end), paste it, and click **Run**.
+   - This adds a new table called `admins` (the list of accounts allowed to
+     access the admin panel), and automatically approves any reports that
+     existed before now (so they don't suddenly disappear from the map).
 
-2. **أعد تشغيل السيرفر الخلفي:** روح لنافذة الـ Terminal يلي فيها
-   السيرفر الخلفي (`backend`) شغال. بما إنه بيستخدم `npm run dev`
-   (وضع المراقبة التلقائي)، المفروض يعيد التشغيل لحاله لما حس بالملفات
-   الجديدة. للتأكد، وقفه (`Ctrl+C`) وشغّله من جديد يدويًا:
+2. **Restart the backend:** go to the Terminal window where the backend
+   (`backend`) is running. Since it uses `npm run dev` (auto-watch mode),
+   it should restart on its own once it detects the new files. To be sure,
+   stop it (`Ctrl+C`) and start it again manually:
    ```
    npm run dev
    ```
-   وتأكد ما في رسالة خطأ حمراء.
+   and make sure there's no red error message.
 
-3. **خلّي حسابك أدمن:** جوا مجلد `backend`، بنفس نافذة الـ Terminal (أو
-   وحدة جديدة)، شغّل هاد الأمر — استبدل الإيميل بإيميل الحساب يلي عملتلو
-   تسجيل دخول بالموقع (بالخطوة 7):
+3. **Make your account an admin:** inside the `backend` folder, in the same
+   Terminal window (or a new one), run this command — replace the email
+   with the email of the account you logged in with on the site (from Step 7):
    ```
    node scripts/make-admin.js your-email@example.com
    ```
-   لازم تشوف رسالة تأكيد إنه الحساب صار أدمن.
+   You should see a confirmation message that the account is now an admin.
 
-4. **سجّل خروج وسجّل دخول من جديد** بالموقع (بنفس الحساب يلي عملتو
-   أدمن بالخطوة السابقة) — هاد ضروري عشان الواجهة تتحقق من جديد إذا
-   حسابك صار أدمن.
+4. **Log out and log back in** on the site (with the same account you made
+   an admin in the previous step) — this is necessary so the frontend
+   re-checks whether your account is an admin.
 
-5. لازم يظهرلك تبويب جديد اسمه **🛡️ الإدارة** فوق. افتحه — رح تشوف كل
-   البلاغات (المعلّقة أولًا)، وجنب كل وحدة زرّين: **قبول ✅** و **رفض ❌**.
-   جرب ترفع بلاغ جديد من تبويب "إبلاغ عن تلوث"، وتأكد إنه **ما بيظهر**
-   عالخريطة العامة قبل ما توافق عليه من لوحة الإدارة، وإنه **بيظهر** فورًا
-   بعد ما تضغط "قبول".
+5. You should now see a new tab called **🛡️ Admin** at the top. Open it —
+   you'll see all the reports (pending ones first), and next to each one
+   two buttons: **Approve ✅** and **Reject ❌**. Try submitting a new
+   report from the "Report Pollution" tab, and confirm that it **doesn't
+   show up** on the public map before you approve it from the admin panel,
+   and that it **shows up** immediately after you click "Approve".
 
-> ملاحظة أمان: التحقق الحقيقي من صلاحية الأدمن بيصير بالسيرفر الخلفي
-> (`requireAdmin` middleware) بغض النظر شو الواجهة عارضة — يعني حتى لو
-> حدا حاول "يخدع" المتصفح ليظهرله تبويب الإدارة، السيرفر رح يرفض أي طلب
-> منه لأنه مش موجود فعليًا بجدول `admins`.
+> Security note: the real check of admin permission happens on the backend
+> (`requireAdmin` middleware) regardless of what the frontend displays —
+> meaning even if someone tries to "trick" the browser into showing them the
+> admin tab, the server will reject any request from them because they
+> aren't actually in the `admins` table.
 
 ---
 
-### الخطوة 9: تفعيل التقارير الدورية التلقائية (Reports)
+### Step 9: Enable automatic periodic reports (Reports)
 
-هاي الميزة بتضيف تبويب جديد "📊 التقارير" (يظهر للأدمن بس، جنب تبويب
-"الإدارة"): النظام بيحسب **تلقائيًا** كل يوم أحد ملخص إحصائي للبلاغات
-(كم بلاغ صار، بأي حي، وأي نوع تلوث) ويحفظه، وكمان الأدمن يقدر يطلب تقرير
-فوري بضغطة زر (لآخر أسبوع أو آخر شهر) ويطبعه أو يحفظه PDF مباشرة من
-المتصفح (بدون أي مكتبة PDF إضافية — بس ميزة الطباعة العادية).
+This feature adds a new "📊 Reports" tab (shown to admins only, next to the
+"Admin" tab): the system **automatically** calculates a statistical summary
+of the reports every Sunday (how many reports happened, in which
+neighborhood, and what pollution type) and saves it, and the admin can also
+request a report on demand with a button click (for the last week or the
+last month) and print it or save it as a PDF directly from the browser (no
+extra PDF library — just the regular print feature).
 
-1. **تحديث قاعدة البيانات:** روح لمشروعك على supabase.com → **SQL Editor**
-   → **New query**، الصق هاد الكود بالضبط، واضغط **Run** (بيضيف جدول جديد
-   بس اسمه `report_snapshots` لحفظ التقارير الأسبوعية — ما بيلمس ولا جدول
-   موجود، فآمن تمامًا تشغّله):
+1. **Update the database:** go to your project on supabase.com → **SQL Editor**
+   → **New query**, paste this exact code, and click **Run** (it adds a new
+   table called `report_snapshots` to store the weekly reports — it doesn't
+   touch any existing table, so it's completely safe to run):
    ```sql
    create table if not exists report_snapshots (
      id            uuid primary key default gen_random_uuid(),
@@ -261,57 +281,66 @@ neighborhood-footprint/
    alter table report_snapshots enable row level security;
    ```
 
-2. **أعد تشغيل السيرفر الخلفي:** بنفس نافذة الـ Terminal تبع `backend`،
-   `Ctrl+C` ثم `npm run dev` من جديد، وتأكد ما في خطأ أحمر.
+2. **Restart the backend:** in the same `backend` Terminal window,
+   `Ctrl+C` then `npm run dev` again, and make sure there's no red error.
 
-3. **سجّل خروج وسجّل دخول من جديد** بالموقع (بحسابك الأدمن) — لازم يطلعلك
-   تبويب جديد **"📊 التقارير"** جنب تبويب "الإدارة".
+3. **Log out and log back in** on the site (with your admin account) — you
+   should see a new tab **"📊 Reports"** next to the "Admin" tab.
 
-4. افتح تبويب "التقارير"، ودوس **"توليد تقرير أسبوعي الآن 🔄"** — هاد
-   بيولّد تقرير فوري بدل ما تنتظر أول يوم أحد (النظام أصلًا رح يعمل نفس
-   الشي لحاله تلقائيًا كل أسبوع طول ما السيرفر شغال، بس هيك تقدر تجربها
-   فورًا).
+4. Open the "Reports" tab, and click **"Generate weekly report now 🔄"** —
+   this generates a report on demand instead of waiting for the first
+   Sunday (the system will already do the same thing automatically every
+   week as long as the server is running, but this lets you try it
+   immediately).
 
-5. بعد ما يطلع التقرير تحت، دوس **"🖨️ طباعة / حفظ PDF"** — رح تفتح نافذة
-   طباعة المتصفح العادية، اختار **"Save as PDF"** (أو "حفظ كـ PDF") بدل
-   الطابعة، واحفظه — هيك عندك تقرير PDF احترافي جاهز تحطه بملحق مشروعك.
+5. Once the report appears below, click **"🖨️ Print / Save as PDF"** — this
+   will open the browser's normal print window, choose **"Save as PDF"**
+   instead of a printer, and save it — now you have a professional PDF
+   report ready to include as an appendix to your project.
 
-> ملاحظة: التقرير الأسبوعي التلقائي الحقيقي (يوم الأحد الساعة 6 صباحًا)
-> بيشتغل بس طول ما السيرفر الخلفي شغال بتلك اللحظة. لعرض المشروع أو
-> لتقريرك المكتوب، استخدم زر "توليد تقرير أسبوعي الآن" وهاد كافي تمامًا
-> لإثبات إنه الميزة شغالة.
+> Note: the real automatic weekly report (Sunday at 6 AM) only runs as long
+> as the backend is running at that moment. For your project presentation
+> or your written report, use the "Generate weekly report now" button — that
+> is completely sufficient to prove the feature works.
 
 ---
 
-## 4) أشياء مهمة تعرفها (لتقرير المشروع)
+## 4) Important things to know (for your project report)
 
-- **الأمان:** السيرفر الخلفي هو الوحيد اللي يقدر يكتب بقاعدة البيانات (عبر
-  service role key). الواجهة الأمامية ما بتتواصل مع Supabase مباشرة أبدًا —
-  كل طلب بيمر عبر الـ API تبعنا. هاد معماري أفضل من ناحية أمنية.
-- **RLS (Row Level Security):** مفعّل على الجداول بقاعدة البيانات كطبقة حماية إضافية.
-- **الخصوصية:** تسجيل الدخول موجود (Supabase Auth) بس اختياري — أي حدا لسا
-  يقدر يبلّغ بدون حساب. لو المستخدم مسجّل دخول، بينحفظ إيميله مع بلاغه.
-- **لوحة الإدارة:** أي بلاغ جديد حالته `pending` (معلّق) وما بيظهر بالخريطة
-  العامة أو لوحة نقاط الأحياء إلا بعد موافقة أدمن (راجع "الخطوة 8" فوق).
-  هاد بيمنع بلاغات غلط/مزعجة من التأثير على نقاط الحي مباشرة.
-- **التقارير الدورية:** ملخص إحصائي (عدد البلاغات حسب الحي ونوع التلوث +
-  مقارنة مع الفترة السابقة) بيتولّد تلقائيًا كل أسبوع (`node-cron`)
-  وبينحفظ بجدول `report_snapshots`، وكمان الأدمن يقدر يطلبه فوريًا ويحفظه
-  PDF من المتصفح مباشرة (راجع "الخطوة 9" فوق).
+- **Security:** the backend is the only thing that can write to the
+  database (via the service role key). The frontend never communicates
+  with Supabase directly — every request goes through our API. This is a
+  more secure architecture.
+- **RLS (Row Level Security):** enabled on the database tables as an extra
+  layer of protection.
+- **Privacy:** login exists (Supabase Auth) but is optional — anyone can
+  still submit a report without an account. If the user is logged in, their
+  email is saved with their report.
+- **Admin panel:** any new report has status `pending` and doesn't show up
+  on the public map or the neighborhood points board until an admin
+  approves it (see "Step 8" above). This prevents wrong/annoying reports
+  from directly affecting a neighborhood's points.
+- **Periodic reports:** a statistical summary (report count by
+  neighborhood and pollution type + comparison with the previous period)
+  is generated automatically every week (`node-cron`) and saved in the
+  `report_snapshots` table, and the admin can also request it on demand and
+  save it as a PDF directly from the browser (see "Step 9" above).
 
-## 5) الخطوات الجاية (اقتراحات لتطوير المشروع)
+## 5) Next steps (suggestions for developing the project further)
 
-هاي أفكار لمراحل قادمة، رتبتها من الأسهل للأصعب:
+Ideas for upcoming stages, ordered from easiest to hardest:
 
-1. ~~تسجيل دخول بسيط للمستخدمين~~ ✅ تمت (راجع "الخطوة 7" فوق).
-2. ~~لوحة إدارة (Admin) لمراجعة البلاغات قبل ظهورها بالخريطة~~ ✅ تمت
-   (راجع "الخطوة 8" فوق).
-3. ~~تقارير دورية تلقائية~~ ✅ تمت (راجع "الخطوة 9" فوق).
-4. **حدود جغرافية حقيقية للأحياء** (polygons) بدل اختيار الحي يدويًا،
-   باستخدام PostGIS أو مكتبة turf.js لتحديد الحي تلقائيًا من الإحداثيات.
-5. **تحسين دقة تصنيف الذكاء الاصطناعي**: قصير المدى بتوسيع/تعديل خريطة
-   الكلمات المفتاحية بملف `aiClassifier.js` (`CATEGORY_KEYWORDS`)، وطويل
-   المدى بجمع صور حقيقية من المستخدمين وتدريب نموذج مخصص (transfer
-   learning) يميّز فئات التلوث تبعتنا بالتحديد بدل الاعتماد على موديل عام.
+1. ~~Simple user login~~ ✅ Done (see "Step 7" above).
+2. ~~Admin panel to review reports before they appear on the map~~ ✅ Done
+   (see "Step 8" above).
+3. ~~Automatic periodic reports~~ ✅ Done (see "Step 9" above).
+4. **Real geographic boundaries for neighborhoods** (polygons) instead of
+   manually selecting a neighborhood, using PostGIS or the turf.js library
+   to automatically determine the neighborhood from coordinates.
+5. **Improve AI classification accuracy**: short-term by expanding/editing
+   the keyword map in `aiClassifier.js` (`CATEGORY_KEYWORDS`), and long-term
+   by collecting real images from users and training a custom model
+   (transfer learning) that recognizes our specific pollution categories
+   instead of relying on a general-purpose model.
 
-قلّي وقت ما تكون جاهز تبلش أي وحدة من هاي، وبنبنيها سوا خطوة خطوة.
+Let me know whenever you're ready to start on any of these, and we'll build it together step by step.

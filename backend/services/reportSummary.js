@@ -1,26 +1,29 @@
 // ============================================================================
 // reportSummary.js
 // ----------------------------------------------------------------------------
-// منطق "التقارير الدورية": بيحسب ملخص إحصائي للبلاغات (الموافق عليها فقط)
-// خلال فترة معيّنة — إجمالي البلاغات، توزيعها حسب الحي وحسب نوع التلوث،
-// ومقارنة مع الفترة اللي قبلها (نسبة الزيادة أو النقصان).
+// "Periodic reports" logic: computes a statistical summary of (approved
+// only) reports over a given period — total reports, their distribution by
+// neighborhood and by pollution type, and a comparison with the previous
+// period (percentage increase or decrease).
 //
-// هاد الملف ما بيتعامل مع أي واجهة (route) مباشرة — بس منطق حساب البيانات،
-// عشان نقدر نستخدمه بمكانين: (1) endpoint حي لما الأدمن يطلب تقرير فوري،
-// و(2) وظيفة node-cron الأسبوعية التلقائية يلي بتحفظ "لقطة" (snapshot).
+// This file doesn't handle any route (endpoint) directly — just the data
+// calculation logic, so we can use it in two places: (1) a live endpoint
+// when the admin requests an instant report, and (2) the automatic weekly
+// node-cron job that saves a "snapshot".
 // ============================================================================
 
 import { supabase } from './supabaseClient.js';
 
-// نفس ترجمة أنواع التلوث الموجودة بالفرونت إند (pollutionTypes.js) — نسخة
-// مستقلة هون لأنه backend وfrontend مشروعين منفصلين ومابيتشاركوا كود.
+// Same pollution type translations found in the frontend (pollutionTypes.js)
+// — a separate copy here because the backend and frontend are two separate
+// projects that don't share code.
 const POLLUTION_LABELS = {
-  garbage_burning: 'حرق قمامة',
-  air_pollution: 'تلوث هوائي / دخان',
-  illegal_dumping: 'رمي نفايات عشوائي',
-  water_pollution: 'تلوث مائي',
-  no_pollution: 'لا يوجد تلوث',
-  unknown: 'غير محدد',
+  garbage_burning: 'Garbage Burning',
+  air_pollution: 'Air Pollution / Smoke',
+  illegal_dumping: 'Illegal Dumping',
+  water_pollution: 'Water Pollution',
+  no_pollution: 'No Pollution',
+  unknown: 'Unknown',
 };
 
 function pollutionLabel(code) {
@@ -28,7 +31,7 @@ function pollutionLabel(code) {
 }
 
 /**
- * بيحسب ملخص البلاغات (الموافق عليها بس) بين تاريخين.
+ * Computes a summary of (approved only) reports between two dates.
  * @param {Date} start
  * @param {Date} end
  */
@@ -41,18 +44,18 @@ async function summarizeReportsBetween(start, end) {
     .lt('created_at', end.toISOString());
 
   if (error) {
-    throw new Error(`فشل جلب البلاغات: ${error.message}`);
+    throw new Error(`Failed to fetch reports: ${error.message}`);
   }
 
   const byNeighborhoodMap = new Map();
   const byTypeMap = new Map();
 
   for (const report of data) {
-    // توزيع حسب الحي
-    const neighborhoodName = report.neighborhoods?.name || 'غير محدد';
+    // Distribution by neighborhood
+    const neighborhoodName = report.neighborhoods?.name || 'Unknown';
     byNeighborhoodMap.set(neighborhoodName, (byNeighborhoodMap.get(neighborhoodName) || 0) + 1);
 
-    // توزيع حسب نوع التلوث
+    // Distribution by pollution type
     const label = pollutionLabel(report.pollution_type);
     byTypeMap.set(label, (byTypeMap.get(label) || 0) + 1);
   }
@@ -69,8 +72,9 @@ async function summarizeReportsBetween(start, end) {
 }
 
 /**
- * الدالة الرئيسية: بترجع ملخص فترة معيّنة (بالأيام) + مقارنة مع الفترة يلي
- * قبلها بنفس الطول (عشان نعرف هل الوضع تحسّن أو ساء).
+ * The main function: returns a summary of a given period (in days) +
+ * a comparison with the same-length period before it (to know whether
+ * things improved or got worse).
  * @param {number} days
  */
 export async function getPeriodSummary(days = 7) {
@@ -87,7 +91,7 @@ export async function getPeriodSummary(days = 7) {
       ((current.totalReports - previous.totalReports) / previous.totalReports) * 100
     );
   } else if (current.totalReports > 0) {
-    percentChange = 100; // من صفر لأي رقم = زيادة كاملة (100%+)، منعرضها كـ 100%
+    percentChange = 100; // from zero to any number = a full increase (100%+), we show it as 100%
   }
 
   return {
@@ -103,16 +107,17 @@ export async function getPeriodSummary(days = 7) {
 }
 
 /**
- * إحصائيات عامة "لكل الوقت" (كل البلاغات الموافق عليها منذ بداية المشروع) —
- * تُستخدم بصفحة "الإحصائيات" العامة (متاحة للجميع، بدون تسجيل دخول)، وبتحتوي:
- *   - إجمالي عدد البلاغات الموافق عليها
- *   - توزيعها حسب الحي (للرسم البياني الشريطي / bar chart)
- *   - توزيعها حسب نوع التلوث (للرسم الدائري / pie chart)
- *   - عدد البلاغات بكل أسبوع من آخر N أسبوع (للرسم الخطي / line chart)
+ * "All time" public statistics (all approved reports since the project
+ * started) — used on the public "Statistics" page (available to everyone,
+ * no login required), and includes:
+ *   - total number of approved reports
+ *   - their distribution by neighborhood (for the bar chart)
+ *   - their distribution by pollution type (for the pie chart)
+ *   - the number of reports per week for the last N weeks (for the line chart)
  *
- * ⚠️ ما في ولا معلومة شخصية هون (بدون user_email أو أي بيانات حساسة) —
- * بس أرقام مجمّعة (aggregated)، فآمنة تمامًا نعرضها للجميع بدون تسجيل دخول،
- * تمامًا متل بيانات الخريطة الحرارية العامة.
+ * ⚠️ There's no personal information here (no user_email or any sensitive
+ * data) — just aggregated numbers, so it's completely safe to show to
+ * everyone without logging in, exactly like the public heatmap data.
  * @param {number} weeksCount
  */
 export async function getOverallStats(weeksCount = 8) {
@@ -122,14 +127,14 @@ export async function getOverallStats(weeksCount = 8) {
     .eq('status', 'approved');
 
   if (error) {
-    throw new Error(`فشل جلب إحصائيات البلاغات: ${error.message}`);
+    throw new Error(`Failed to fetch report statistics: ${error.message}`);
   }
 
   const byNeighborhoodMap = new Map();
   const byTypeMap = new Map();
 
   for (const report of data) {
-    const neighborhoodName = report.neighborhoods?.name || 'غير محدد';
+    const neighborhoodName = report.neighborhoods?.name || 'Unknown';
     byNeighborhoodMap.set(neighborhoodName, (byNeighborhoodMap.get(neighborhoodName) || 0) + 1);
 
     const label = pollutionLabel(report.pollution_type);
@@ -144,9 +149,10 @@ export async function getOverallStats(weeksCount = 8) {
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
 
-  // نقسم آخر (weeksCount * 7) يوم لـ "دلاء" (buckets) أسبوعية، وكل بلاغ
-  // منحطه بالدلو المناسب حسب تاريخه — هيك منحصل على نقطة واحدة بالرسم
-  // الخطي عن كل أسبوع، بدل ما نسوي استعلام منفصل لكل أسبوع.
+  // We split the last (weeksCount * 7) days into weekly "buckets", and put
+  // every report in the right bucket based on its date — this gives us one
+  // data point per week for the line chart, instead of running a separate
+  // query for each week.
   const now = new Date();
   const buckets = [];
   for (let i = weeksCount - 1; i >= 0; i--) {
@@ -176,11 +182,11 @@ export async function getOverallStats(weeksCount = 8) {
 }
 
 /**
- * لوحة المتصدرين (Leaderboard) — أكتر المستخدمين نشاطًا بالإبلاغ (حسب عدد
- * البلاغات الموافق عليها فقط). عامة ومتاحة للجميع بدون تسجيل دخول، تمامًا
- * متل باقي البيانات المجمّعة بلوحة الإحصائيات — والإيميلات هون أصلًا ظاهرة
- * للعموم بالخريطة (النافذة المنبثقة لكل بلاغ)، فما في معلومة إضافية جديدة
- * منكشفها هون.
+ * Leaderboard — the most active reporters (based only on approved report
+ * count). Public and available to everyone without logging in, just like
+ * the rest of the aggregated data on the statistics dashboard — and these
+ * emails are already publicly visible on the map (in each report's popup),
+ * so there's no new information being exposed here.
  * @param {number} limit
  */
 export async function getLeaderboard(limit = 10) {
@@ -191,7 +197,7 @@ export async function getLeaderboard(limit = 10) {
     .not('user_email', 'is', null);
 
   if (error) {
-    throw new Error(`فشل جلب لوحة المتصدرين: ${error.message}`);
+    throw new Error(`Failed to fetch the leaderboard: ${error.message}`);
   }
 
   const countMap = new Map();
@@ -206,10 +212,11 @@ export async function getLeaderboard(limit = 10) {
 }
 
 /**
- * وظيفة "التقرير الأسبوعي التلقائي": بتحسب ملخص آخر 7 أيام وبتحفظه بجدول
- * report_snapshots — هاد يلي بيشتغل لحاله كل أسبوع عبر node-cron
- * (راجع server.js)، وكمان ممكن الأدمن يشغّله يدويًا من لوحة الإدارة لو
- * بده يشوف تقرير فوري بدون ما ينتظر الموعد الأسبوعي.
+ * The "automatic weekly report" job: computes a summary of the last 7 days
+ * and saves it in the report_snapshots table — this is what runs on its own
+ * every week via node-cron (see server.js), and the admin can also run it
+ * manually from the admin panel if they want to see a live report without
+ * waiting for the weekly schedule.
  */
 export async function saveWeeklySnapshot() {
   const summary = await getPeriodSummary(7);
@@ -226,10 +233,10 @@ export async function saveWeeklySnapshot() {
     .single();
 
   if (error) {
-    throw new Error(`فشل حفظ التقرير الأسبوعي: ${error.message}`);
+    throw new Error(`Failed to save the weekly report: ${error.message}`);
   }
 
-  console.log(`📊 تم إنشاء وحفظ التقرير الأسبوعي التلقائي (${summary.totalReports} بلاغ) بتاريخ ${new Date().toLocaleString()}`);
+  console.log(`📊 Automatic weekly report generated and saved (${summary.totalReports} reports) on ${new Date().toLocaleString()}`);
 
   return data;
 }

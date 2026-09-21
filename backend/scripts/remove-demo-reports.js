@@ -1,11 +1,12 @@
 // ============================================================================
 // remove-demo-reports.js
 // ----------------------------------------------------------------------------
-// بيحذف كل البلاغات التجريبية يلي انضافت عبر seed-demo-reports.js فقط —
-// بيتعرّف عليها من علامة داخلية { seed: true } بحقل ai_raw_labels (مش ظاهرة
-// بأي مكان بالواجهة)، فمستحيل يحذف غلط ولا بلاغ حقيقي رفعه مستخدم فعلي.
+// Deletes only the demo reports that were added via seed-demo-reports.js —
+// they're identified by an internal { seed: true } marker in the
+// ai_raw_labels field (not shown anywhere in the UI), so there's no risk of
+// accidentally deleting a real report submitted by an actual user.
 //
-// الاستخدام (من جوا مجلد backend):
+// Usage (from inside the backend folder):
 //   node scripts/remove-demo-reports.js
 // ============================================================================
 
@@ -18,12 +19,12 @@ async function main() {
     .eq('ai_raw_labels->>seed', 'true');
 
   if (findError) {
-    console.error('❌ صار خطأ وقت البحث عن البلاغات التجريبية:', findError.message);
+    console.error('❌ An error occurred while searching for demo reports:', findError.message);
     process.exit(1);
   }
 
   if (!demoReports || demoReports.length === 0) {
-    console.log('ℹ️  ما في ولا بلاغ تجريبي لحذفه — كل شي نظيف أصلًا.');
+    console.log('ℹ️  There are no demo reports to delete — everything is already clean.');
     return;
   }
 
@@ -32,13 +33,13 @@ async function main() {
   const { error: deleteError } = await supabase.from('reports').delete().in('id', ids);
 
   if (deleteError) {
-    console.error('❌ صار خطأ وقت الحذف:', deleteError.message);
+    console.error('❌ An error occurred while deleting:', deleteError.message);
     process.exit(1);
   }
 
-  console.log(`✅ تم حذف ${ids.length} بلاغ تجريبي بنجاح.`);
-  console.log('ℹ️  ملاحظة: نقاط الأحياء يلي نزلت وقت إضافة البلاغات التجريبية ما بترجع تلقائيًا —');
-  console.log('   بترجع لحالها تدريجيًا مع وظيفة "التعافي اليومية" العادية، أو تقدر تعدّلها يدويًا من Supabase.');
+  console.log(`✅ Successfully deleted ${ids.length} demo reports.`);
+  console.log('ℹ️  Note: neighborhood points that dropped when the demo reports were added do not come back automatically —');
+  console.log('   they recover gradually via the regular "daily recovery" job, or you can adjust them manually from Supabase.');
 }
 
 main();

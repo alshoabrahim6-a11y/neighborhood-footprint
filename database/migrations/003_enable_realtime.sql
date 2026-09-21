@@ -1,25 +1,28 @@
 -- ============================================================================
 -- 003_enable_realtime.sql
 -- ----------------------------------------------------------------------------
--- ميزة "تحديث الخريطة اللحظي": عشان الفرونت إند يقدر يستقبل إشعارات فورية
--- كل ما يصير أي تغيير بجدول reports (بلاغ جديد، موافقة، رفض...)، لازم
--- نفعّل خاصية Realtime على هاد الجدول بمشروع Supabase تبعك.
+-- "Live map updates" feature: for the frontend to receive instant
+-- notifications whenever anything changes in the reports table (new report,
+-- approval, rejection...), we need to enable the Realtime feature on this
+-- table in your Supabase project.
 --
--- ⚠️ ملاحظة: لو رجّعلك هاد الكود خطأ "relation "reports" is already
--- member of publication" فهاد يعني Realtime أصلًا مفعّل على الجدول —
--- عادي، تجاهل الخطأ ومتابع، ما في داعي تعمل شي إضافي.
+-- ⚠️ Note: if this code returns an error like "relation "reports" is
+-- already member of publication", that means Realtime is already enabled
+-- on the table — that's fine, ignore the error and continue, no need to do
+-- anything else.
 --
--- بديل أسهل (لو حبيت): بدل ما تشغّل هاد الكود، تقدر من لوحة تحكم
--- Supabase تروح لـ: Database → Replication → دوس على "supabase_realtime"
--- → فعّل (toggle) جدول "reports".
+-- Easier alternative (if you'd like): instead of running this code, you can
+-- go from the Supabase dashboard to: Database → Replication → click
+-- "supabase_realtime" → enable (toggle) the "reports" table.
 --
--- طريقة التشغيل (مرة وحدة بس)، بالضبط متل باقي ملفات migrations:
---   1) افتح مشروعك على supabase.com → SQL Editor
---   2) اعمل New query، الصق كل محتوى هاد الملف، واضغط Run
+-- How to run it (only once), exactly like the other migration files:
+--   1) Open your project on supabase.com → SQL Editor
+--   2) Click New query, paste this entire file's content, and click Run
 -- ============================================================================
 
 alter publication supabase_realtime add table reports;
 
 -- ============================================================================
--- خلص! رجع عالتطبيق — رفرش صفحة الخريطة وشوف الشارة الخضرا "تحديث لحظي مفعّل"
+-- Done! Go back to the app — refresh the map page and check for the green
+-- "Live updates enabled" badge
 -- ============================================================================

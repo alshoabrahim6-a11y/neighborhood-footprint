@@ -1,8 +1,9 @@
 // ============================================================================
 // UploadForm.jsx
 // ----------------------------------------------------------------------------
-// فورم رفع بلاغ تلوث جديد: صورة + موقع (تلقائي من المتصفح أو يدوي) + حي +
-// ملاحظة اختيارية. بعد الإرسال، بيعرض نتيجة تصنيف الذكاء الاصطناعي.
+// Form for submitting a new pollution report: photo + location (automatic
+// from the browser or manual) + neighborhood + optional note. After
+// submitting, it shows the AI classification result.
 // ============================================================================
 
 import { useEffect, useState } from 'react';
@@ -24,7 +25,7 @@ export default function UploadForm({ session }) {
   useEffect(() => {
     fetchNeighborhoods()
       .then(setNeighborhoods)
-      .catch(() => setError('ما قدرنا نجيب قائمة الأحياء. تأكد إن السيرفر شغال.'));
+      .catch(() => setError("Couldn't fetch the neighborhood list. Make sure the server is running."));
   }, []);
 
   function handleImageChange(e) {
@@ -36,7 +37,7 @@ export default function UploadForm({ session }) {
 
   function handleUseMyLocation() {
     if (!navigator.geolocation) {
-      setError('المتصفح تبعك ما بيدعم تحديد الموقع.');
+      setError("Your browser doesn't support location detection.");
       return;
     }
     setLocating(true);
@@ -49,7 +50,7 @@ export default function UploadForm({ session }) {
         setLocating(false);
       },
       () => {
-        setError('ما قدرنا نجيب موقعك. جرب تسمح للمتصفح بالوصول للموقع، أو دخّل الإحداثيات يدويًا.');
+        setError('Could not get your location. Try allowing the browser to access your location, or enter the coordinates manually.');
         setLocating(false);
       }
     );
@@ -60,8 +61,8 @@ export default function UploadForm({ session }) {
     setError(null);
     setResult(null);
 
-    if (!image) return setError('لازم ترفع صورة.');
-    if (!coords.latitude || !coords.longitude) return setError('لازم تحدد الموقع.');
+    if (!image) return setError('You must upload a photo.');
+    if (!coords.latitude || !coords.longitude) return setError('You must set the location.');
 
     try {
       setSubmitting(true);
@@ -71,17 +72,17 @@ export default function UploadForm({ session }) {
         longitude: coords.longitude,
         neighborhoodId,
         description,
-        // لو مسجّل دخول، منبعت توكن جلسته عشان يترسم البلاغ باسمه
+        // If logged in, send the session token so the report is recorded under their name
         accessToken: session?.access_token,
       });
       setResult(data);
-      // تفريغ الفورم بعد نجاح الإرسال
+      // Clear the form after a successful submission
       setImage(null);
       setPreviewUrl(null);
       setDescription('');
     } catch (err) {
       console.error(err);
-      setError('فشل إرسال البلاغ. تأكد إن السيرفر الخلفي شغال وحاول مرة ثانية.');
+      setError('Failed to submit the report. Make sure the backend server is running and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -89,18 +90,18 @@ export default function UploadForm({ session }) {
 
   return (
     <div className="upload-page">
-      <h2>الإبلاغ عن تلوث</h2>
+      <h2>Report Pollution</h2>
       <form onSubmit={handleSubmit} className="upload-form">
         <label>
-          الصورة
+          Photo
           <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} required />
         </label>
-        {previewUrl && <img src={previewUrl} alt="معاينة" className="preview-img" />}
+        {previewUrl && <img src={previewUrl} alt="Preview" className="preview-img" />}
 
         <label>
-          الحي
+          Neighborhood
           <select value={neighborhoodId} onChange={(e) => setNeighborhoodId(e.target.value)}>
-            <option value="">-- اختر الحي --</option>
+            <option value="">-- Select a neighborhood --</option>
             {neighborhoods.map((n) => (
               <option key={n.id} value={n.id}>
                 {n.name}
@@ -111,12 +112,12 @@ export default function UploadForm({ session }) {
 
         <div className="location-row">
           <button type="button" onClick={handleUseMyLocation} disabled={locating}>
-            {locating ? 'جارِ تحديد الموقع...' : '📍 استخدم موقعي الحالي'}
+            {locating ? 'Locating...' : '📍 Use My Current Location'}
           </button>
           <input
             type="number"
             step="any"
-            placeholder="خط العرض (latitude)"
+            placeholder="Latitude"
             value={coords.latitude}
             onChange={(e) => setCoords({ ...coords, latitude: e.target.value })}
             required
@@ -124,7 +125,7 @@ export default function UploadForm({ session }) {
           <input
             type="number"
             step="any"
-            placeholder="خط الطول (longitude)"
+            placeholder="Longitude"
             value={coords.longitude}
             onChange={(e) => setCoords({ ...coords, longitude: e.target.value })}
             required
@@ -132,18 +133,18 @@ export default function UploadForm({ session }) {
         </div>
 
         <label>
-          ملاحظة (اختياري)
+          Note (optional)
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
         </label>
 
         <p className="submit-as-hint">
           {session
-            ? `رح ينحفظ البلاغ باسم: ${session.user.email}`
-            : 'ملاحظة: أنت مش مسجّل دخول، فالبلاغ رح ينحفظ بدون ربطه بأي حساب.'}
+            ? `This report will be saved under: ${session.user.email}`
+            : "Note: you're not logged in, so this report will be saved without being linked to any account."}
         </p>
 
         <button type="submit" className="primary-btn" disabled={submitting}>
-          {submitting ? 'جارِ الإرسال وتحليل الصورة بالذكاء الاصطناعي...' : 'إرسال البلاغ'}
+          {submitting ? 'Submitting and analyzing the image with AI...' : 'Submit Report'}
         </button>
       </form>
 
@@ -151,20 +152,20 @@ export default function UploadForm({ session }) {
 
       {result && (
         <div className="result-card">
-          <h3>تم استلام البلاغ ✅</h3>
+          <h3>Report Received ✅</h3>
           <p>
-            صنّف الذكاء الاصطناعي الصورة على أنها:{' '}
+            The AI classified the image as:{' '}
             <b style={{ color: getPollutionInfo(result.classification.pollutionType).color }}>
               {getPollutionInfo(result.classification.pollutionType).label}
             </b>{' '}
-            (نسبة ثقة {Math.round(result.classification.confidence * 100)}%)
+            (confidence {Math.round(result.classification.confidence * 100)}%)
           </p>
           <p className="suggestion-text">
             💡 {getPollutionInfo(result.classification.pollutionType).suggestion}
           </p>
           {result.report?.is_duplicate && (
             <p className="duplicate-note">
-              ⚠️ في بلاغ مشابه انبعت مؤخرًا قريب من نفس المكان — بلاغك انحفظ عادي وضل ينضاف لتأكيد المشكلة، وفريق الإدارة رح يراجعه.
+              ⚠️ A similar report was recently submitted near the same location — your report was saved normally and will help confirm the issue, and the admin team will review it.
             </p>
           )}
         </div>

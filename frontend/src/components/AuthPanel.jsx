@@ -1,20 +1,22 @@
 // ============================================================================
 // AuthPanel.jsx
 // ----------------------------------------------------------------------------
-// شريط صغير بأعلى الصفحة: لو المستخدم مسجّل دخول، بيوري إيميله وزر خروج.
-// لو مش مسجّل، بيوري فورم صغير (إيميل + باسوورد) فيه زرين: "دخول" و"حساب جديد".
+// A small bar at the top of the page: if the user is logged in, it shows
+// their email and a logout button. If not, it shows a small form (email +
+// password) with two buttons: "Login" and "New Account".
 //
-// ملاحظة: التسجيل هون اختياري — الموقع بيضل يشتغل حتى بدون تسجيل دخول
-// (البلاغات العامة والخريطة ونقاط الأحياء كلها متاحة للجميع). ميزة الحساب
-// هون بس عشان نعرف "مين بعث أي بلاغ"، وهاي بداية لميزات مستقبلية (لوحة
-// إدارة، سجل بلاغاتي الشخصية...).
+// Note: signing up is optional — the site keeps working even without
+// logging in (public reports, the map, and the neighborhood board are all
+// available to everyone). The account feature here is just so we know "who
+// sent which report", and this is a starting point for future features
+// (admin panel, personal report history...).
 // ============================================================================
 
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 export default function AuthPanel({ session }) {
-  const [mode, setMode] = useState('login'); // 'login' أو 'signup'
+  const [mode, setMode] = useState('login'); // 'login' or 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,7 @@ export default function AuthPanel({ session }) {
       if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMessage('تم إنشاء الحساب! إذا كان مفعّل تأكيد الإيميل بمشروعك، تأكد من صندوق بريدك قبل ما تسجّل دخول.');
+        setMessage('Account created! If email confirmation is enabled on your project, check your inbox before logging in.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -38,13 +40,13 @@ export default function AuthPanel({ session }) {
       }
       setPassword('');
     } catch (err) {
-      // ترجمة أبسط لأشهر رسائل الخطأ من Supabase
+      // Simpler translation for the most common Supabase error messages
       if (err.message?.includes('Invalid login credentials')) {
-        setMessage('الإيميل أو الباسوورد غلط.');
+        setMessage('Wrong email or password.');
       } else if (err.message?.includes('User already registered')) {
-        setMessage('هاد الإيميل مسجّل أصلاً — جرب "تسجيل دخول" بدل "حساب جديد".');
+        setMessage('This email is already registered — try "Login" instead of "New Account".');
       } else {
-        setMessage(err.message || 'صار خطأ غير متوقع.');
+        setMessage(err.message || 'An unexpected error occurred.');
       }
     } finally {
       setLoading(false);
@@ -55,25 +57,25 @@ export default function AuthPanel({ session }) {
     await supabase.auth.signOut();
   }
 
-  // --- مستخدم مسجّل دخول ---
+  // --- Logged-in user ---
   if (session) {
     return (
       <div className="auth-bar">
         <span className="auth-email">👤 {session.user.email}</span>
         <button className="auth-link-btn" onClick={handleLogout}>
-          تسجيل خروج
+          Log Out
         </button>
       </div>
     );
   }
 
-  // --- مستخدم غير مسجّل: زر بسيط يفتح الفورم ---
+  // --- Not logged in: a simple button that opens the form ---
   if (!showForm) {
     return (
       <div className="auth-bar">
-        <span className="auth-hint">بتقدر تبلّغ بدون تسجيل، بس تسجيل الدخول بيخليك تتابع بلاغاتك</span>
+        <span className="auth-hint">You can report without logging in, but logging in lets you track your reports</span>
         <button className="auth-link-btn" onClick={() => setShowForm(true)}>
-          تسجيل دخول / حساب جديد
+          Log In / New Account
         </button>
       </div>
     );
@@ -84,31 +86,31 @@ export default function AuthPanel({ session }) {
       <form onSubmit={handleSubmit} className="auth-form">
         <input
           type="email"
-          placeholder="الإيميل"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
         <input
           type="password"
-          placeholder="الباسوورد (6 أحرف ع الأقل)"
+          placeholder="Password (at least 6 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           minLength={6}
           required
         />
         <button type="submit" className="primary-btn auth-submit-btn" disabled={loading}>
-          {loading ? '...' : mode === 'signup' ? 'إنشاء حساب' : 'دخول'}
+          {loading ? '...' : mode === 'signup' ? 'Create Account' : 'Log In'}
         </button>
         <button
           type="button"
           className="auth-link-btn"
           onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
         >
-          {mode === 'signup' ? 'عندك حساب؟ سجّل دخول' : 'ما عندك حساب؟ سجّل واحد جديد'}
+          {mode === 'signup' ? 'Already have an account? Log in' : "Don't have an account? Create one"}
         </button>
         <button type="button" className="auth-link-btn" onClick={() => setShowForm(false)}>
-          إلغاء
+          Cancel
         </button>
       </form>
       {message && <p className="auth-message">{message}</p>}

@@ -1,16 +1,17 @@
 // ============================================================================
 // fix-admin.js
 // ----------------------------------------------------------------------------
-// سكريبت "شامل": بياخد إيميل + باسوورد جديد، وبيعمل شيئين بضربة وحدة:
-//   1) يغيّر باسوورد الحساب لقيمة جديدة إنت تحددها (مفيد لو ناسي الباسوورد
-//      القديم أو مش عم تشتغل معك لأي سبب).
-//   2) يضيف نفس الحساب للائحة الأدمنية (admins) عشان يقدر يفتح لوحة الإدارة.
+// An "all-in-one" script: takes an email + a new password, and does two
+// things at once:
+//   1) Changes the account's password to a new value you choose (useful if
+//      you forgot the old password or it's not working for some reason).
+//   2) Adds that same account to the admin list (admins) so they can open the admin panel.
 //
-// الاستخدام (من جوا مجلد backend):
+// Usage (from inside the backend folder):
 //   node scripts/fix-admin.js your-email@example.com NewPassword123
 //
-// ملاحظة: اختار باسوورد فيه 6 أحرف عالأقل، وتذكره كويس عشان تسجّل فيه دخول
-// بعدين بالموقع.
+// Note: choose a password with at least 6 characters, and remember it well
+// so you can log in with it afterward on the site.
 // ============================================================================
 
 import 'dotenv/config';
@@ -19,7 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 const [, , emailArg, newPassword] = process.argv;
 
 if (!emailArg || !newPassword) {
-  console.error('❌ الاستخدام الصحيح: node scripts/fix-admin.js <email> <new-password>');
+  console.error('❌ Correct usage: node scripts/fix-admin.js <email> <new-password>');
   process.exit(1);
 }
 
@@ -27,53 +28,53 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
-  console.error('❌ ما لقيت SUPABASE_URL أو SUPABASE_SERVICE_ROLE_KEY بملف .env');
+  console.error('❌ Could not find SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in the .env file');
   process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-// 1) نلاقي الحساب بالإيميل المحدد
+// 1) Find the account with the given email
 const { data: listData, error: listError } = await supabase.auth.admin.listUsers({ perPage: 1000 });
 if (listError) {
-  console.error('❌ صار خطأ وقت البحث عن الحساب:', listError.message);
+  console.error('❌ An error occurred while searching for the account:', listError.message);
   process.exit(1);
 }
 
 const user = listData.users.find((u) => u.email?.toLowerCase() === emailArg.toLowerCase());
 
 if (!user) {
-  console.error(`❌ ما لقيت حساب بهاد الإيميل بالضبط: ${emailArg}`);
-  console.error('   شغّل node scripts/list-users.js عشان تشوف الإيميلات المسجّلة فعليًا.');
+  console.error(`❌ Could not find an account with exactly this email: ${emailArg}`);
+  console.error('   Run node scripts/list-users.js to see the emails actually registered.');
   process.exit(1);
 }
 
-// 2) نغيّر الباسوورد
+// 2) Change the password
 const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
   password: newPassword,
 });
 
 if (updateError) {
-  console.error('❌ صار خطأ وقت تغيير الباسوورد:', updateError.message);
+  console.error('❌ An error occurred while changing the password:', updateError.message);
   process.exit(1);
 }
 
-console.log(`✅ تم تغيير الباسوورد بنجاح لحساب: ${user.email}`);
-console.log(`   الباسوورد الجديد: ${newPassword}`);
+console.log(`✅ Password changed successfully for account: ${user.email}`);
+console.log(`   New password: ${newPassword}`);
 
-// 3) نضيفه للائحة الأدمنية (لو مش مضاف أصلًا)
+// 3) Add them to the admin list (if not already added)
 const { error: insertError } = await supabase.from('admins').insert({ user_id: user.id });
 
 if (insertError) {
   if (insertError.code === '23505') {
-    console.log('ℹ️  الحساب كان مضاف أصلًا كأدمن من قبل — كل شي تمام.');
+    console.log('ℹ️  The account was already an admin — all good.');
   } else {
-    console.error('❌ صار خطأ وقت إضافته كأدمن:', insertError.message);
+    console.error('❌ An error occurred while adding them as an admin:', insertError.message);
     process.exit(1);
   }
 } else {
-  console.log('✅ تمت إضافة الحساب كأدمن بنجاح.');
+  console.log('✅ Account successfully added as an admin.');
 }
 
-console.log('\n🎉 خلص! هلق روح لموقع بصمة الحي، سجّل دخول بهاد الإيميل والباسوورد الجديد،');
-console.log('   ولازم يطلعلك تبويب "🛡️ الإدارة" فوق.');
+console.log('\n🎉 Done! Now go to the Neighborhood Footprint site, log in with this email and the new password,');
+console.log('   and the "🛡️ Admin" tab should show up at the top.');
