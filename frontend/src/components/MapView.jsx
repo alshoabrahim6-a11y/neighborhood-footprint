@@ -96,8 +96,8 @@ export default function MapView() {
           : 'unknown';
 
         marker.bindPopup(`
-          <div style="text-align:left; font-family: sans-serif; min-width:180px">
-            <img src="${report.image_url}" style="width:100%; border-radius:6px; margin-bottom:6px" />
+          <div style="text-align:left; font-family: sans-serif; min-width:180px; max-width:220px">
+            <img src="${report.image_url}" style="width:100%; max-height:140px; object-fit:cover; border-radius:6px; margin-bottom:6px; display:block" />
             <b>${info.label}</b><br/>
             AI confidence: ${confidencePct}<br/>
             ${report.neighborhoods?.name ? `Neighborhood: ${report.neighborhoods.name}<br/>` : ''}
