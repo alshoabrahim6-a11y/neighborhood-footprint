@@ -3,7 +3,9 @@
 // ----------------------------------------------------------------------------
 // Instead of using a full routing library, we use simple "tabs" (just state)
 // to navigate between: the map, reporting pollution, the neighborhood points
-// board, and the admin panel (shown only to admins).
+// board, and the admin panel (shown only to admins). Navigation is a left
+// sidebar on wide screens that collapses into a horizontal bar on narrow
+// screens, rather than a top tab strip.
 //
 // We also track "login" (session) state centrally: as soon as the page
 // opens, we fetch any session already saved (if the user logged in before
@@ -16,7 +18,7 @@
 // backend (requireAdmin middleware) regardless of what the UI shows.
 // ============================================================================
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import MapView from './components/MapView';
 import UploadForm from './components/UploadForm';
 import NeighborhoodBoard from './components/NeighborhoodBoard';
@@ -117,69 +119,52 @@ export default function App() {
 
   const ActiveComponent = TABS[activeTab]?.component || MapView;
 
-  // ----------------------------------------------------------------------------
-  // Animated tab indicator under the active tab: every time we switch tabs,
-  // we measure the active button's position and width (getBoundingClientRect)
-  // and smoothly move a small underline (transform + width in CSS), instead
-  // of it jumping suddenly.
-  // ----------------------------------------------------------------------------
-  const tabRefs = useRef({});
-  const navRef = useRef(null);
-  const [indicatorStyle, setIndicatorStyle] = useState({ transform: 'translateX(0)', width: 0 });
-
-  useEffect(() => {
-    const activeButton = tabRefs.current[activeTab];
-    const nav = navRef.current;
-    if (!activeButton || !nav) return;
-
-    setIndicatorStyle({
-      transform: `translateX(${activeButton.offsetLeft}px)`,
-      width: `${activeButton.offsetWidth}px`,
-    });
-  }, [activeTab, TABS]);
-
   return (
-    <div className="app">
-      <header className="app-header no-print">
-        <div className="app-header-top">
-          <h1>{t('appTitle')}</h1>
+    <div className="app-shell">
+      <aside className="app-sidebar no-print">
+        <div className="sidebar-brand">
+          <span className="sidebar-brand-icon" aria-hidden="true">🌿</span>
+          <div>
+            <div className="sidebar-brand-title">{t('appTitle')}</div>
+            <div className="sidebar-brand-subtitle">{t('appSubtitle')}</div>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          {Object.entries(TABS).map(([key, tab]) => (
+            <button
+              key={key}
+              className={key === activeTab ? 'sidebar-link active' : 'sidebar-link'}
+              onClick={() => setActiveTab(key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
           <SettingsSelector />
         </div>
-        <p className="subtitle">{t('appSubtitle')}</p>
-      </header>
+      </aside>
 
-      {!isOnline && <div className="offline-banner no-print">{t('offlineBanner')}</div>}
+      <div className="app-content">
+        {!isOnline && <div className="offline-banner no-print">{t('offlineBanner')}</div>}
 
-      <div className="no-print">
-        <AuthPanel session={session} />
-      </div>
-
-      <nav className="tabs no-print" ref={navRef}>
-        {Object.entries(TABS).map(([key, tab]) => (
-          <button
-            key={key}
-            ref={(el) => {
-              tabRefs.current[key] = el;
-            }}
-            className={key === activeTab ? 'tab active' : 'tab'}
-            onClick={() => setActiveTab(key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-        <span className="tab-indicator" style={indicatorStyle} />
-      </nav>
-
-      <main className="app-main">
-        {/* We pass session to every tab; tabs unrelated to login (map,
-            neighborhood board) just get an unused prop, which is fine.
-            key={activeTab} makes React recreate the component every time we
-            switch tabs, re-triggering the "fadeInUp" effect (.tab-content)
-            each time. */}
-        <div key={activeTab} className="tab-content">
-          <ActiveComponent session={session} />
+        <div className="no-print">
+          <AuthPanel session={session} />
         </div>
-      </main>
+
+        <main className="app-main">
+          {/* We pass session to every tab; tabs unrelated to login (map,
+              neighborhood board) just get an unused prop, which is fine.
+              key={activeTab} makes React recreate the component every time we
+              switch tabs, re-triggering the "fadeInUp" effect (.tab-content)
+              each time. */}
+          <div key={activeTab} className="tab-content">
+            <ActiveComponent session={session} />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
