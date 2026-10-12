@@ -1,15 +1,18 @@
 // ============================================================================
 // SettingsContext.jsx
 // ----------------------------------------------------------------------------
-// Two small, independent user preferences, both remembered across visits
-// via localStorage: UI language (ar/en) and color theme (light/dark).
+// One user preference remembered across visits via localStorage: color
+// theme (light/dark). The app is English-only (the earlier Arabic/English
+// language switch was removed per the project owner's choice), so `t()`
+// always resolves against English — it's kept so components can still call
+// t('someKey') without needing to change, in case translations come back.
 //
-// Any component can read/change these with the useSettings() hook below,
-// instead of passing props down through every page.
+// Any component can read/change the theme with the useSettings() hook
+// below, instead of passing props down through every page.
 // ============================================================================
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { LANGUAGES, translate } from './i18n';
+import { translate } from './i18n';
 
 const SettingsContext = createContext(null);
 
@@ -29,35 +32,29 @@ function writeStored(key, value) {
   }
 }
 
+const LANG = 'en';
+
 export function SettingsProvider({ children }) {
-  const [lang, setLangState] = useState(() => readStored('nf_lang', 'en'));
   const [theme, setThemeState] = useState(() => readStored('nf_theme', 'light'));
 
-  // Reflect both preferences onto <html> so plain CSS (dir, [data-theme])
-  // can react to them without every component needing to know.
   useEffect(() => {
-    document.documentElement.setAttribute('dir', LANGUAGES[lang]?.dir || 'ltr');
-    document.documentElement.setAttribute('lang', lang);
-  }, [lang]);
+    document.documentElement.setAttribute('dir', 'ltr');
+    document.documentElement.setAttribute('lang', LANG);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
-
-  function setLang(next) {
-    setLangState(next);
-    writeStored('nf_lang', next);
-  }
 
   function setTheme(next) {
     setThemeState(next);
     writeStored('nf_theme', next);
   }
 
-  const t = (key) => translate(lang, key);
+  const t = (key) => translate(LANG, key);
 
   return (
-    <SettingsContext.Provider value={{ lang, setLang, theme, setTheme, t }}>
+    <SettingsContext.Provider value={{ theme, setTheme, t }}>
       {children}
     </SettingsContext.Provider>
   );
