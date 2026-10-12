@@ -25,19 +25,24 @@ import AdminPanel from './components/AdminPanel';
 import ReportsView from './components/ReportsView';
 import AboutPage from './components/AboutPage';
 import StatsDashboard from './components/StatsDashboard';
+import SettingsSelector from './components/SettingsSelector';
 import { checkIsAdmin } from './api';
 import { supabase } from './supabaseClient';
+import { useSettings } from './SettingsContext';
 import './App.css';
 
-const BASE_TABS = {
-  map: { label: '🗺️ Map', component: MapView },
-  upload: { label: '📸 Report Pollution', component: UploadForm },
-  board: { label: '🏆 Neighborhood Points', component: NeighborhoodBoard },
-  stats: { label: '📈 Statistics', component: StatsDashboard },
-  about: { label: '📖 About', component: AboutPage },
+// Tab labels come from the translation dictionary (t()) instead of being
+// hardcoded here, so they follow the selected language — see src/i18n.js.
+const BASE_TAB_KEYS = {
+  map: { labelKey: 'tabMap', component: MapView },
+  upload: { labelKey: 'tabUpload', component: UploadForm },
+  board: { labelKey: 'tabBoard', component: NeighborhoodBoard },
+  stats: { labelKey: 'tabStats', component: StatsDashboard },
+  about: { labelKey: 'tabAbout', component: AboutPage },
 };
 
 export default function App() {
+  const { t } = useSettings();
   const [activeTab, setActiveTab] = useState('map');
   const [session, setSession] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -87,17 +92,21 @@ export default function App() {
   // The "Admin" tab only shows up if the user is actually an admin.
   // useMemo so we don't create a new object on every render, otherwise the
   // useEffect below would run unnecessarily every time.
-  const TABS = useMemo(
-    () =>
-      isAdmin
-        ? {
-            ...BASE_TABS,
-            admin: { label: '🛡️ Admin', component: AdminPanel },
-            reports: { label: '📊 Reports', component: ReportsView },
-          }
-        : BASE_TABS,
-    [isAdmin]
-  );
+  const TABS = useMemo(() => {
+    const base = isAdmin
+      ? {
+          ...BASE_TAB_KEYS,
+          admin: { labelKey: 'tabAdmin', component: AdminPanel },
+          reports: { labelKey: 'tabReports', component: ReportsView },
+        }
+      : BASE_TAB_KEYS;
+
+    // Resolve each tab's translated label now, so the rest of the render
+    // below doesn't need to know about labelKey vs label.
+    return Object.fromEntries(
+      Object.entries(base).map(([key, tab]) => [key, { ...tab, label: t(tab.labelKey) }])
+    );
+  }, [isAdmin, t]);
 
   // If we were on the "Admin" tab and the user then logs out (or turns out
   // not to be an admin), send them back automatically to the map tab
@@ -130,17 +139,16 @@ export default function App() {
   }, [activeTab, TABS]);
 
   return (
-    <div className="app" dir="ltr">
+    <div className="app">
       <header className="app-header no-print">
-        <h1>Neighborhood Footprint</h1>
-        <p className="subtitle">Community-driven environmental pollution monitoring</p>
+        <div className="app-header-top">
+          <h1>{t('appTitle')}</h1>
+          <SettingsSelector />
+        </div>
+        <p className="subtitle">{t('appSubtitle')}</p>
       </header>
 
-      {!isOnline && (
-        <div className="offline-banner no-print">
-          📴 You're currently offline — the data shown may be the last version saved on your device. Submitting a new report or logging in requires an internet connection.
-        </div>
-      )}
+      {!isOnline && <div className="offline-banner no-print">{t('offlineBanner')}</div>}
 
       <div className="no-print">
         <AuthPanel session={session} />

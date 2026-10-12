@@ -13,8 +13,9 @@
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react';
-import { fetchAdminReports, updateReportStatus } from '../api';
+import { fetchAdminReports, fetchAdminRole, updateReportStatus } from '../api';
 import { getPollutionInfo } from '../pollutionTypes';
+import ManageAdmins from './ManageAdmins';
 
 const STATUS_LABELS = {
   pending: { label: 'Pending ⏳', className: 'status-pending' },
@@ -27,6 +28,7 @@ export default function AdminPanel({ session }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [role, setRole] = useState(null);
 
   const accessToken = session?.access_token;
 
@@ -49,6 +51,7 @@ export default function AdminPanel({ session }) {
   useEffect(() => {
     if (!accessToken) return;
     loadReports();
+    fetchAdminRole(accessToken).then(setRole);
   }, [accessToken, loadReports]);
 
   async function handleDecision(reportId, status) {
@@ -57,8 +60,13 @@ export default function AdminPanel({ session }) {
       await updateReportStatus(reportId, status, accessToken);
       // Instead of reloading everything from the server, update the report's status locally right away
       setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, status } : r)));
-    } catch {
-      setError('The operation failed. Try again.');
+      setError(null);
+    } catch (err) {
+      // Once a report is approved/rejected the backend refuses to flip it
+      // again (409) and sends a clear message — show that instead of a
+      // generic failure so the admin understands the decision is final.
+      const serverMessage = err?.response?.data?.error;
+      setError(serverMessage || 'The operation failed. Try again.');
     } finally {
       setBusyId(null);
     }
@@ -125,20 +133,28 @@ export default function AdminPanel({ session }) {
                 <p className="suggestion-text">💡 {info.suggestion}</p>
 
                 <div className="admin-card-actions">
-                  <button
-                    className="approve-btn"
-                    disabled={busyId === report.id || report.status === 'approved'}
-                    onClick={() => handleDecision(report.id, 'approved')}
-                  >
-                    Approve ✅
-                  </button>
-                  <button
-                    className="reject-btn"
-                    disabled={busyId === report.id || report.status === 'rejected'}
-                    onClick={() => handleDecision(report.id, 'rejected')}
-                  >
-                    Reject ❌
-                  </button>
+                  {report.status === 'pending' ? (
+                    <>
+                      <button
+                        className="approve-btn"
+                        disabled={busyId === report.id}
+                        onClick={() => handleDecision(report.id, 'approved')}
+                      >
+                        Approve ✅
+                      </button>
+                      <button
+                        className="reject-btn"
+                        disabled={busyId === report.id}
+                        onClick={() => handleDecision(report.id, 'rejected')}
+                      >
+                        Reject ❌
+                      </button>
+                    </>
+                  ) : (
+                    <p className="decision-final-note">
+                      This decision is final and can no longer be changed.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -147,6 +163,8 @@ export default function AdminPanel({ session }) {
 
         {reports.length === 0 && !error && <p>No reports yet.</p>}
       </div>
+
+      {role === 'admin' && <ManageAdmins session={session} />}
     </div>
   );
 }

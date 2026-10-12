@@ -9,7 +9,7 @@
 //   node scripts/make-admin.js your-email@example.com
 // ============================================================================
 
-import { supabase } from '../services/supabaseClient.js';
+import { supabase } from '../../services/supabaseClient.js';
 
 const email = process.argv[2];
 

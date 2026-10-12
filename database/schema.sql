@@ -88,13 +88,15 @@ create policy "public read reports" on reports
 -- only through our server (which uses the service role key and bypasses RLS).
 
 -- ----------------------------------------------------------------------------
--- 4) Admins table — admin panel
---    Any account (user_id) present in this table can open the admin panel
---    and approve/reject reports. Entries are normally added via the
---    backend/scripts/make-admin.js script, not manually from here.
+-- 4) Admins table — role-based access (RBAC)
+--    Any account (user_id) present in this table has elevated permissions,
+--    at the level given by "role". Admins are managed from INSIDE the app
+--    (Admin Panel -> Manage Admins), not from standalone scripts.
 -- ----------------------------------------------------------------------------
 create table if not exists admins (
   user_id    uuid primary key references auth.users(id) on delete cascade,
+  role       text not null default 'admin' check (role in ('admin', 'moderator')),
+  added_by   uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
 

@@ -75,7 +75,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     const imageUrl = publicUrlData.publicUrl;
 
     // 2) Classify the image with AI (CLIP via Hugging Face)
-    const classification = await classifyPollutionImage(req.file.buffer);
+    const classification = await classifyPollutionImage(req.file.buffer, req.file.mimetype);
 
     // 2.5) Duplicate report detection: is there a previous report nearby
     // (< 100 meters) with the same pollution type within the last two

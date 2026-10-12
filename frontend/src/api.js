@@ -82,6 +82,18 @@ export async function checkIsAdmin(accessToken) {
   }
 }
 
+/** Returns this account's admin role ('admin' | 'moderator'), or null if not an admin at all */
+export async function fetchAdminRole(accessToken) {
+  try {
+    const res = await api.get('/api/admin/check', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return res.data.role || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Fetches all reports (in every status) for the admin to review */
 export async function fetchAdminReports(accessToken) {
   const res = await api.get('/api/admin/reports', {
@@ -97,6 +109,46 @@ export async function updateReportStatus(reportId, status, accessToken) {
     { status },
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
+  return res.data;
+}
+
+// ----------------------------------------------------------------------------
+// Admin & user management — replaces the old backend/scripts/make-admin.js /
+// list-users.js / fix-admin.js workflow. Everything here is done from inside
+// the app and is itself protected by admin permission on the backend.
+// ----------------------------------------------------------------------------
+
+/** All registered accounts, with their admin role if they have one */
+export async function fetchAllUsers(accessToken) {
+  const res = await api.get('/api/admin/users', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+/** Just the accounts that currently have admin/moderator access */
+export async function fetchAdmins(accessToken) {
+  const res = await api.get('/api/admin/admins', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+/** Grants admin (or moderator) access to an existing account, by email */
+export async function addAdmin(email, role, accessToken) {
+  const res = await api.post(
+    '/api/admin/admins',
+    { email, role },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return res.data;
+}
+
+/** Revokes an account's admin/moderator access */
+export async function removeAdmin(userId, accessToken) {
+  const res = await api.delete(`/api/admin/admins/${userId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   return res.data;
 }
 

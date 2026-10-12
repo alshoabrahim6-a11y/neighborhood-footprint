@@ -37,6 +37,35 @@
   --transition-base: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ----------------------------------------------------------------------------
+   Dark theme — toggled by the theme selector (adds data-theme="dark" on
+   <html>, saved to localStorage so it's remembered on the next visit).
+   Same variable names as :root above, just re-pointed to dark-friendly
+   colors, so every component that already uses var(--color-*) gets the
+   dark theme automatically with no further changes needed.
+---------------------------------------------------------------------------- */
+:root[data-theme='dark'] {
+  --color-primary: #3fa968;
+  --color-primary-dark: #cdebd9;
+  --color-primary-light: #16301f;
+  --color-accent: #e0b64a;
+  --color-accent-dark: #f0cd73;
+  --color-accent-light: #332a12;
+  --color-text: #e8ebe9;
+  --color-text-muted: #a9b3ad;
+  --color-bg: #121a15;
+  --color-surface: #1a2a20;
+  --color-border: #2c3c32;
+  --color-danger: #e07a7a;
+  --color-danger-light: #3a1f1f;
+  --color-warning-bg: #3a331a;
+  --color-warning-text: #e8c97a;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -132,6 +161,72 @@ body {
   margin: 6px 0 0;
   font-size: 0.9rem;
   opacity: 0.92;
+}
+
+.app-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.settings-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.settings-selector select {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+.settings-selector select option {
+  color: var(--color-text);
+}
+
+.theme-toggle-btn {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .settings-selector {
+    position: static;
+    transform: none;
+    justify-content: center;
+    margin-top: 8px;
+  }
 }
 
 /* ---------- Offline banner (PWA) ---------- */
@@ -474,6 +569,64 @@ body {
   font-size: 0.9rem;
 }
 
+.success-text {
+  color: var(--color-primary);
+  font-size: 0.9rem;
+}
+
+/* ---------- Manage Admins (Admin Panel) ---------- */
+.manage-admins {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.add-admin-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.add-admin-form input[type='email'] {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+}
+
+.add-admin-form select {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+}
+
+.add-admin-form button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admins-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admins-table th,
+.admins-table td {
+  text-align: start;
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+
 /* ---------- Automatic suggestion ---------- */
 .suggestion-text {
   margin: 8px 0 0;
@@ -624,6 +777,13 @@ body {
 .reject-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.decision-final-note {
+  margin: 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--color-text-muted, #777);
 }
 
 /* ---------- Reports (periodic reports) ---------- */

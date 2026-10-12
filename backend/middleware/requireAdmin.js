@@ -25,9 +25,13 @@ export async function requireAdmin(req, res, next) {
     return res.status(401).json({ error: 'Invalid session, please log in again' });
   }
 
+  // select('*') (not an explicit column list) so this keeps working even
+  // before migration 004_admin_roles.sql has been run on this project's
+  // database yet (the 'role' column wouldn't exist yet otherwise, and an
+  // explicit select('user_id, role') would error out on every request).
   const { data: adminRow, error: adminError } = await supabase
     .from('admins')
-    .select('user_id')
+    .select('*')
     .eq('user_id', userData.user.id)
     .maybeSingle();
 
@@ -40,7 +44,20 @@ export async function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'This account does not have admin permission' });
   }
 
-  // Attach the user data to the request so any endpoint after this one can use it
+  // Attach the user data to the request so any endpoint after this one can use it.
+  // `role` comes from the admins table (RBAC) — 'admin' has full access,
+  // 'moderator' can review reports but cannot manage other admins (see
+  // routes/admin.js, requireFullAdmin).
   req.user = userData.user;
+  req.user.role = adminRow.role || 'admin';
+  next();
+}
+
+// A stricter guard for endpoints only a full 'admin' should reach (e.g.
+// granting/revoking admin access to other accounts). Use after requireAdmin.
+export function requireFullAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Only full admins can manage other admin accounts' });
+  }
   next();
 }

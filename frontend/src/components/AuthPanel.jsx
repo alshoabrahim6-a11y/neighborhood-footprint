@@ -2,21 +2,33 @@
 // AuthPanel.jsx
 // ----------------------------------------------------------------------------
 // A small bar at the top of the page: if the user is logged in, it shows
-// their email and a logout button. If not, it shows a small form (email +
-// password) with two buttons: "Login" and "New Account".
+// their email and a logout button. If not, it shows a small form with three
+// modes: "Login" (password), "New Account" (password), and "Magic Link"
+// (passwordless — Supabase emails a one-time sign-in link).
 //
 // Note: signing up is optional — the site keeps working even without
 // logging in (public reports, the map, and the neighborhood board are all
 // available to everyone). The account feature here is just so we know "who
 // sent which report", and this is a starting point for future features
 // (admin panel, personal report history...).
+//
+// Email verification: whether a new signup must confirm their email before
+// they can log in is a project-level setting in Supabase itself (Dashboard
+// -> Authentication -> Providers -> Email -> "Confirm email"), not
+// something this file controls. With it ON, a brand-new account can't sign
+// in with a password until they click the confirmation link Supabase
+// emails them. The magic link mode here always requires owning the inbox
+// anyway (there's no password to guess), so it's a safe way to log in or
+// sign up either way.
 // ============================================================================
 
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useSettings } from '../SettingsContext';
 
 export default function AuthPanel({ session }) {
-  const [mode, setMode] = useState('login'); // 'login' or 'signup'
+  const { t } = useSettings();
+  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'magic'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,6 +45,13 @@ export default function AuthPanel({ session }) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         setMessage('Account created! If email confirmation is enabled on your project, check your inbox before logging in.');
+      } else if (mode === 'magic') {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (error) throw error;
+        setMessage("Check your inbox — we've sent you a one-time sign-in link. Opening it logs you in automatically (no password needed).");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -63,7 +82,7 @@ export default function AuthPanel({ session }) {
       <div className="auth-bar">
         <span className="auth-email">👤 {session.user.email}</span>
         <button className="auth-link-btn" onClick={handleLogout}>
-          Log Out
+          {t('authLogout')}
         </button>
       </div>
     );
@@ -73,13 +92,15 @@ export default function AuthPanel({ session }) {
   if (!showForm) {
     return (
       <div className="auth-bar">
-        <span className="auth-hint">You can report without logging in, but logging in lets you track your reports</span>
+        <span className="auth-hint">{t('authHint')}</span>
         <button className="auth-link-btn" onClick={() => setShowForm(true)}>
-          Log In / New Account
+          {t('authLoginOrSignup')}
         </button>
       </div>
     );
   }
+
+  const submitLabels = { login: 'Log In', signup: 'Create Account', magic: 'Send Magic Link' };
 
   return (
     <div className="auth-bar auth-bar-form">
@@ -91,23 +112,35 @@ export default function AuthPanel({ session }) {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <input
-          type="password"
-          placeholder="Password (at least 6 characters)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          minLength={6}
-          required
-        />
+        {mode !== 'magic' && (
+          <input
+            type="password"
+            placeholder="Password (at least 6 characters)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={6}
+            required
+          />
+        )}
         <button type="submit" className="primary-btn auth-submit-btn" disabled={loading}>
-          {loading ? '...' : mode === 'signup' ? 'Create Account' : 'Log In'}
+          {loading ? '...' : submitLabels[mode]}
         </button>
+
+        {mode !== 'magic' && (
+          <button
+            type="button"
+            className="auth-link-btn"
+            onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
+          >
+            {mode === 'signup' ? 'Already have an account? Log in' : "Don't have an account? Create one"}
+          </button>
+        )}
         <button
           type="button"
           className="auth-link-btn"
-          onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
+          onClick={() => setMode(mode === 'magic' ? 'login' : 'magic')}
         >
-          {mode === 'signup' ? 'Already have an account? Log in' : "Don't have an account? Create one"}
+          {mode === 'magic' ? 'Use a password instead' : 'Log in without a password (magic link)'}
         </button>
         <button type="button" className="auth-link-btn" onClick={() => setShowForm(false)}>
           Cancel
