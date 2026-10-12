@@ -407,11 +407,46 @@ body {
 
 .map-container {
   width: 100%;
-  height: 65vh;
+  height: 48vh;
+  min-height: 320px;
+  max-height: 520px;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
+  position: relative; /* anchors the "tap to interact" overlay */
+}
+
+@media (max-width: 520px) {
+  .map-container {
+    height: 38vh;
+    min-height: 260px;
+  }
+}
+
+/* Shown over the map until the user taps/clicks it once, so a page
+   scroll/swipe that merely passes over the map doesn't get captured by it
+   (Leaflet dragging/scrollWheelZoom/touchZoom are disabled until then). */
+.map-activate-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 500; /* above Leaflet's own panes */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 59, 37, 0.12);
+  cursor: pointer;
+  backdrop-filter: blur(1px);
+}
+
+.map-activate-overlay span {
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 8px 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .badge {

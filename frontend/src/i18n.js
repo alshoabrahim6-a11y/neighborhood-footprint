@@ -45,6 +45,10 @@ const dict = {
   themeLabel: { en: 'Theme', ar: 'المظهر' },
   themeLight: { en: '☀️ Light', ar: '☀️ فاتح' },
   themeDark: { en: '🌙 Dark', ar: '🌙 داكن' },
+  mapTapToInteract: {
+    en: '👆 Tap to interact with the map',
+    ar: '👆 دوس للتفاعل مع الخريطة',
+  },
 };
 
 export function translate(lang, key) {

@@ -15,6 +15,7 @@ import 'leaflet.heat';
 import { fetchHeatmapPoints, fetchReports } from '../api';
 import { getPollutionInfo } from '../pollutionTypes';
 import { supabase } from '../supabaseClient';
+import { useSettings } from '../SettingsContext';
 
 // Fix a common issue: Leaflet's default marker icon doesn't show correctly
 // with build tools like Vite, so we set the image paths manually.
@@ -33,12 +34,17 @@ const DEFAULT_CENTER = [3.139, 101.6869]; // Kuala Lumpur, as an example
 const DEFAULT_ZOOM = 12;
 
 export default function MapView() {
+  const { t } = useSettings();
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reportCount, setReportCount] = useState(0);
   const [liveStatus, setLiveStatus] = useState('connecting');
+  // The map starts "inert" (no drag/scroll-zoom) so that scrolling the page
+  // past it, or swiping it on a phone, doesn't get captured by the map
+  // instead of the page. One tap/click on it turns those back on.
+  const [mapActivated, setMapActivated] = useState(false);
 
   // All the layers we add to the map (the heat layer + report markers) — we
   // track them here so we can clear them before drawing the new batch when
@@ -116,7 +122,15 @@ export default function MapView() {
     // Create the map only once (when the component first appears)
     if (mapRef.current) return;
 
-    const map = L.map(mapContainerRef.current).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    // Start with dragging/scroll-zoom/touch-zoom OFF (see mapActivated above)
+    // — they're turned back on in the "activate" handler below, the first
+    // time the user actually taps/clicks the map itself.
+    const map = L.map(mapContainerRef.current, {
+      dragging: false,
+      scrollWheelZoom: false,
+      touchZoom: false,
+      doubleClickZoom: false,
+    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
     mapRef.current = map;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -165,6 +179,19 @@ export default function MapView() {
     };
   }, [loadData]);
 
+  // First tap/click on the map: turn its own gestures back on and hide the
+  // overlay. Leaflet's own click handling still works normally after this.
+  function handleActivateMap() {
+    if (mapActivated) return;
+    setMapActivated(true);
+    const map = mapRef.current;
+    if (!map) return;
+    map.dragging.enable();
+    map.scrollWheelZoom.enable();
+    map.touchZoom.enable();
+    map.doubleClickZoom.enable();
+  }
+
   return (
     <div className="map-page">
       <div className="map-header">
@@ -175,7 +202,14 @@ export default function MapView() {
         </div>
       </div>
       {error && <p className="error-text">{error}</p>}
-      <div ref={mapContainerRef} className="map-container" />
+      <div className="map-container">
+        <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+        {!mapActivated && (
+          <div className="map-activate-overlay" onClick={handleActivateMap} onTouchStart={handleActivateMap}>
+            <span>{t('mapTapToInteract')}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
